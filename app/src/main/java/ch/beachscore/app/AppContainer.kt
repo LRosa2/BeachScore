@@ -8,12 +8,16 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import ch.beachscore.app.data.HistoryRepository
 import ch.beachscore.app.data.MatchRepository
+import ch.beachscore.app.data.PlayerRepository
+import ch.beachscore.app.data.db.HistoryDatabase
 import ch.beachscore.app.data.SettingsRepository
 import ch.beachscore.app.input.HardwareKeyInput
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.speech.TtsSpeaker
 import ch.beachscore.app.ui.ScoreboardViewModel
+import ch.beachscore.app.ui.records.RecordsViewModel
 import ch.beachscore.app.voice.EchoGuard
 import ch.beachscore.app.voice.ModelStore
 import ch.beachscore.app.voice.VoiceInput
@@ -53,6 +57,10 @@ class AppContainer(context: Context) {
 
     val voiceInput by lazy { VoiceInput(app, ModelStore(app), echoGuard, appScope) }
 
+    private val database by lazy { HistoryDatabase.open(app) }
+    val historyRepository by lazy { HistoryRepository(database) }
+    val playerRepository by lazy { PlayerRepository(database) }
+
     val viewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
             ScoreboardViewModel(
@@ -62,7 +70,10 @@ class AppContainer(context: Context) {
                 clock = SystemClock::elapsedRealtime,
                 hardwareKeys = hardwareKeys,
                 voice = voiceInput,
+                history = historyRepository,
+                players = playerRepository,
             )
         }
+        initializer { RecordsViewModel(historyRepository, playerRepository) }
     }
 }

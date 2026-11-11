@@ -21,8 +21,10 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.ui.BeachScoreTheme
-import ch.beachscore.app.ui.ScoreboardRoute
+import ch.beachscore.app.ui.BeachScoreRoot
+import ch.beachscore.app.ui.Screen
 import ch.beachscore.app.ui.ScoreboardViewModel
+import ch.beachscore.app.ui.records.RecordsViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
@@ -31,6 +33,10 @@ class MainActivity : ComponentActivity() {
 
     private val container get() = (application as BeachScoreApp).container
     private val viewModel: ScoreboardViewModel by viewModels { container.viewModelFactory }
+    private val records: RecordsViewModel by viewModels { container.viewModelFactory }
+
+    /** Hardware keys and voice act only while the scoreboard itself is shown. */
+    private var scoreboardShown = true
 
     /** UI language this activity instance was created with; a change recreates it. */
     private lateinit var uiLanguage: Language
@@ -61,7 +67,10 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(state.loaded, state.settings.language) {
                     if (state.loaded && state.settings.language != uiLanguage) recreate()
                 }
-                ScoreboardRoute(viewModel, state)
+                BeachScoreRoot(viewModel, state, records) { screen ->
+                    scoreboardShown = screen == Screen.SCOREBOARD
+                    viewModel.onScoreboardVisible(scoreboardShown)
+                }
             }
         }
     }
@@ -86,7 +95,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (container.hardwareKeys.onKey(event.keyCode, event.action, event.repeatCount)) return true
+        if (scoreboardShown && container.hardwareKeys.onKey(event.keyCode, event.action, event.repeatCount)) return true
         return super.dispatchKeyEvent(event)
     }
 

@@ -70,6 +70,7 @@ class ScoreboardViewModel(
     private var flashSeq = 0
 
     private var foreground = false
+    private var scoreboardVisible = true
     private var micPermission = false
     private var heardJob: Job? = null
     private var allPlayers: Map<Long, Player> = emptyMap()
@@ -184,6 +185,12 @@ class ScoreboardViewModel(
         updateListening()
     }
 
+    /** History and statistics screens hide the scoreboard; voice pauses meanwhile. */
+    fun onScoreboardVisible(visible: Boolean) {
+        scoreboardVisible = visible
+        updateListening()
+    }
+
     /** Current RECORD_AUDIO grant, checked by the activity whenever it starts. */
     fun onMicPermission(granted: Boolean) {
         micPermission = granted
@@ -266,7 +273,7 @@ class ScoreboardViewModel(
             _uiState.update { it.copy(voicePermissionDenied = true) }
             updateSettings { it.copy(voiceCommands = false) }
         }
-        val want = match != null && settings.voiceCommands && foreground && micPermission
+        val want = match != null && settings.voiceCommands && foreground && scoreboardVisible && micPermission
         if (want) voice.start(settings.language, settings.voiceSensitivity) else voice.stop()
         if (!want || !settings.showHeard) {
             heardJob?.cancel()

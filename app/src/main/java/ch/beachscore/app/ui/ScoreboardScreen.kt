@@ -9,6 +9,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +20,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -54,6 +58,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,8 +69,9 @@ import ch.beachscore.app.score.Team
 
 /** Connects the view model to the stateless screen and hosts the settings sheet. */
 @Composable
-fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState) {
+fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, onOpenHistory: () -> Unit = {}) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var pickerTeam by rememberSaveable { mutableStateOf<Team?>(null) }
     var speechNoticeDismissed by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     // Asked only when the user switches voice commands on; never at start.
@@ -89,7 +95,19 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState) {
         onNewMatch = viewModel::onNewMatch,
         onNextSet = viewModel::onNextSet,
         onOpenSettings = { showSettings = true },
+        onOpenHistory = onOpenHistory,
+        onNames = { pickerTeam = it },
     )
+    pickerTeam?.let { team ->
+        LineupPicker(
+            lineup = state.lineup,
+            players = state.activePlayers,
+            initialTeam = team,
+            onToggle = viewModel::togglePlayer,
+            onAddPlayer = viewModel::addPlayer,
+            onDone = { pickerTeam = null },
+        )
+    }
     if (showSettings) {
         SettingsSheet(
             settings = state.settings,
@@ -115,6 +133,8 @@ fun ScoreboardScreen(
     onNewMatch: () -> Unit,
     onNextSet: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit = {},
+    onNames: (Team) -> Unit = {},
 ) {
     // Left means left on screen, whatever the locale: hardware keys and swap rely on it.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -132,6 +152,16 @@ fun ScoreboardScreen(
                     )
                 }
             }
+            // Name areas: a sibling layer above the halves. Only the pills themselves take touches
+            // (the rest of this layer has no pointer input), and a sibling on top receives the
+            // touch instead of the halves, so tapping a name never scores.
+            Row(Modifier.fillMaxSize()) {
+                for ((side, team) in listOf(Side.LEFT to state.left, Side.RIGHT to state.right)) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        NameArea(team, side, onClick = { onNames(team.team) }, modifier = Modifier.align(Alignment.TopCenter))
+                    }
+                }
+            }
             LockBar(state, Modifier.align(Alignment.TopCenter))
             VoiceIndicator(state.voice, Modifier.align(Alignment.TopCenter))
             ControlStrip(
@@ -140,9 +170,10 @@ fun ScoreboardScreen(
                 onSwapSides = onSwapSides,
                 onNewMatch = onNewMatch,
                 onOpenSettings = onOpenSettings,
+                onOpenHistory = onOpenHistory,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
-            state.setWon?.let { SetWonOverlay(it, onNextSet = onNextSet, onUndo = onUndo) }
+            state.setWon?.let { SetWonOverlay(it, onNextSet = onNextSet, onNewMatch = onNewMatch, onUndo = onUndo) }
         }
     }
 }
@@ -166,7 +197,6 @@ private suspend fun PointerInputScope.detectScoringTaps(onSide: (Side) -> Unit) 
 
 @Composable
 private fun TeamHalf(team: TeamUi, side: Side, locked: Boolean, flash: PointFlash?, modifier: Modifier) {
-    val name = teamName(team.team)
     val flashAlpha = remember { Animatable(0f) }
     LaunchedEffect(flash?.seq) {
         if (flash == null) return@LaunchedEffect
@@ -181,11 +211,6 @@ private fun TeamHalf(team: TeamUi, side: Side, locked: Boolean, flash: PointFlas
             .drawBehind { if (flashAlpha.value > 0f) drawRect(Color.White.copy(alpha = flashAlpha.value)) }
             .testTag("half_$side"),
     ) {
-        SetDots(
-            name = name,
-            sets = team.sets,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
-        )
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // As large as the half allows: digit glyphs are ~0.71 em high and a tabular digit is
             // ~0.56 em wide, so this keeps two digits inside the width with a small margin.
@@ -213,6 +238,39 @@ private fun TeamHalf(team: TeamUi, side: Side, locked: Boolean, flash: PointFlas
                     .testTag("points_$side"),
             )
         }
+    }
+}
+
+/**
+ * Small pill near the top of a half: the sets indicator and the team's players, or a subtle
+ * "Players" hint. Opens the lineup picker. Deliberately small (one line, 44 dp high) so the
+ * score area stays the dominant tap target; it never scores.
+ */
+@Composable
+private fun NameArea(team: TeamUi, side: Side, onClick: () -> Unit, modifier: Modifier) {
+    val names = team.players.joinToString(" · ") { it.name }
+    Row(
+        modifier
+            .padding(top = 10.dp)
+            .fillMaxWidth(0.7f)
+            .wrapContentWidth()
+            .heightIn(min = 44.dp)
+            .background(Color.Black.copy(alpha = 0.22f), RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .testTag("names_$side"),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (team.sets > 0) SetDots(teamName(team.team), team.sets, Modifier)
+        Text(
+            names.ifEmpty { stringResource(R.string.players_hint) },
+            color = TeamColors.OnTeam.copy(alpha = if (names.isEmpty()) 0.6f else 1f),
+            fontSize = 20.sp,
+            fontWeight = if (names.isEmpty()) FontWeight.Normal else FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

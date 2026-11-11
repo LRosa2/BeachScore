@@ -62,6 +62,7 @@ fun ControlStrip(
     onSwapSides: () -> Unit,
     onNewMatch: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var hintToken by remember { mutableIntStateOf(0) }
@@ -99,6 +100,7 @@ fun ControlStrip(
             StripButton(R.string.undo, onUndo, enabled = canUndo, tag = "undo")
             StripButton(R.string.swap_sides, onSwapSides, tag = "swap")
             HoldToResetButton(onReset = onNewMatch, onShortTap = { hintToken++ })
+            StripButton(R.string.history, onOpenHistory, tag = "history")
             StripButton(R.string.settings, onOpenSettings, tag = "settings")
         }
     }

@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -29,7 +30,7 @@ import ch.beachscore.app.R
  * can be scored while it is shown; Undo stays available and takes the winning point back.
  */
 @Composable
-fun SetWonOverlay(setWon: SetWonUi, onNextSet: () -> Unit, onUndo: () -> Unit) {
+fun SetWonOverlay(setWon: SetWonUi, onNextSet: () -> Unit, onNewMatch: () -> Unit, onUndo: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
@@ -51,12 +52,20 @@ fun SetWonOverlay(setWon: SetWonUi, onNextSet: () -> Unit, onUndo: () -> Unit) {
                 fontWeight = FontWeight.Black,
                 style = TextStyle(fontFeatureSettings = "tnum"),
             )
-            Button(
-                onClick = onNextSet,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = setWon.winner.color),
-                modifier = Modifier.height(96.dp).widthIn(min = 360.dp).testTag("next_set"),
-            ) {
-                Text(stringResource(R.string.next_set), fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            // Two equally large buttons: single-set and multi-set matches are both common.
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                for ((label, action, tag) in listOf(
+                    Triple(R.string.next_set, onNextSet, "next_set"),
+                    Triple(R.string.new_match, onNewMatch, "overlay_new_match"),
+                )) {
+                    Button(
+                        onClick = action,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = setWon.winner.color),
+                        modifier = Modifier.height(96.dp).width(320.dp).testTag(tag),
+                    ) {
+                        Text(stringResource(label), fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                }
             }
             TextButton(onClick = onUndo, modifier = Modifier.testTag("overlay_undo")) {
                 Text(stringResource(R.string.undo), fontSize = 20.sp, color = TeamColors.OnTeam)
