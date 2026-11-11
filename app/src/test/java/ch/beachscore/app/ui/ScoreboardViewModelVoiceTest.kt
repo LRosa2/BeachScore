@@ -145,6 +145,22 @@ class ScoreboardViewModelVoiceTest {
     }
 
     @Test
+    fun `noise right after an accepted command does not hide it`() = runTest {
+        val vm = viewModel()
+        voice.hear("point blue", point(Team.BLUE))
+        voice.hear("[unk] [unk]", Verdict.Rejected(RejectReason.UNKNOWN), 0.3)
+        assertEquals("point blue", vm.ui.voice.lastHeard!!.text)
+        // Real words do replace it.
+        voice.hear("point red", Verdict.Rejected(RejectReason.LOW_CONFIDENCE), 0.6)
+        assertEquals("point red", vm.ui.voice.lastHeard!!.text)
+        // Once the accepted line is gone, noise is shown again.
+        voice.hear("undo", Verdict.Accepted(ScoreCommand.Undo))
+        advanceTimeBy(ScoreboardViewModel.HEARD_VISIBLE_MS + 1)
+        voice.hear("[unk]", Verdict.Rejected(RejectReason.UNKNOWN), 0.3)
+        assertEquals("[unk]", vm.ui.voice.lastHeard!!.text)
+    }
+
+    @Test
     fun `diagnostics line can be switched off`() = runTest {
         settingsStore.update { it.copy(showHeard = false) }
         val vm = viewModel()

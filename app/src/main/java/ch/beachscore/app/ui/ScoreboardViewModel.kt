@@ -18,6 +18,7 @@ import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.score.ScoreEngine
 import ch.beachscore.app.score.Team
 import ch.beachscore.app.speech.Speaker
+import ch.beachscore.app.voice.CommandParser
 import ch.beachscore.app.voice.Heard
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
@@ -252,6 +253,10 @@ class ScoreboardViewModel(
             is Verdict.Rejected -> v
         }
         if (!settings.showHeard) return
+        // Without pauses, noise right after a command arrives as its own "[unk]" result; it
+        // must not replace the command's line before it could be read.
+        val shown = _uiState.value.voice.lastHeard
+        if (shown?.verdict is Verdict.Accepted && heard.text.split(' ').all { it == CommandParser.UNKNOWN_WORD }) return
         heardJob?.cancel()
         _uiState.update { it.copy(voice = it.voice.copy(lastHeard = heard.copy(verdict = verdict), heardSeq = it.voice.heardSeq + 1)) }
         heardJob = viewModelScope.launch {
