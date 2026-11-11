@@ -1,0 +1,27 @@
+<resources>
+    <string name="team_blue">Blau</string>
+    <string name="team_red">Rot</string>
+    <string name="sets_won">%1$s: %2$d Sätze gewonnen</string>
+    <string name="points_of">%1$s: %2$d Punkte</string>
+
+    <string name="undo">Rückgängig</string>
+    <string name="swap_sides">Seiten tauschen</string>
+    <string name="new_match">Neues Spiel</string>
+    <string name="hold_to_reset">Zum Zurücksetzen halten</string>
+    <string name="settings">Einstellungen</string>
+
+    <string name="set_won">Satz %1$s %2$d:%3$d</string>
+    <string name="next_set">Nächster Satz</string>
+
+    <string name="close">Schließen</string>
+    <string name="points_per_set">Punkte pro Satz</string>
+    <string name="announce_score">Spielstand ansagen</string>
+    <string name="language">Sprache</string>
+    <string name="tap_lock">Tippsperre: %1$s s</string>
+    <string name="tap_lock_hint">Nach einem Punkt ignorieren beide Hälften Berührungen so lange.</string>
+    <string name="hardware_buttons">Hardware-Tasten zählen Punkte</string>
+    <string name="hardware_buttons_hint">Lauter: linkes Team · Leiser: rechtes Team</string>
+    <string name="test_voice">Stimme testen</string>
+    <string name="speech_unavailable">Sprachausgabe ist für diese Sprache auf diesem Gerät nicht verfügbar. Die Anzeige funktioniert trotzdem. Für die Ansage eine Stimme in den System-Einstellungen für Text-in-Sprache installieren.</string>
+    <string name="ok">OK</string>
+</resources>
