@@ -1,12 +1,14 @@
 package ch.beachscore.app.ui
 
 import ch.beachscore.app.data.Settings
+import ch.beachscore.app.history.Lineup
+import ch.beachscore.app.history.Player
 import ch.beachscore.app.score.Team
 import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.voice.Heard
 import ch.beachscore.app.voice.VoiceStatus
 
-data class TeamUi(val team: Team, val points: Int, val sets: Int)
+data class TeamUi(val team: Team, val points: Int, val sets: Int, val players: List<Player> = emptyList())
 
 data class SetWonUi(val winner: Team, val winnerPoints: Int, val loserPoints: Int)
 
@@ -18,6 +20,9 @@ data class ScoreboardUiState(
     val left: TeamUi = TeamUi(Team.BLUE, 0, 0),
     val right: TeamUi = TeamUi(Team.RED, 0, 0),
     val canUndo: Boolean = false,
+    val lineup: Lineup = Lineup(),
+    /** Players offered by the lineup picker (archived ones are hidden). */
+    val activePlayers: List<Player> = emptyList(),
     val setWon: SetWonUi? = null,
     /** True while the tap lock ignores further points. */
     val locked: Boolean = false,

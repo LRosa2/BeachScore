@@ -1,6 +1,14 @@
 package ch.beachscore.app.fakes
 
+import ch.beachscore.app.data.AddPlayerResult
+import ch.beachscore.app.data.HistoryStore
 import ch.beachscore.app.data.MatchStore
+import ch.beachscore.app.data.PlayerStore
+import ch.beachscore.app.history.Lineup
+import ch.beachscore.app.history.MatchRecord
+import ch.beachscore.app.history.NameCheck
+import ch.beachscore.app.history.Player
+import ch.beachscore.app.history.PlayerNames
 import ch.beachscore.app.data.PersistedMatch
 import ch.beachscore.app.data.Settings
 import ch.beachscore.app.data.SettingsStore
@@ -12,9 +20,11 @@ import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceControl
 import ch.beachscore.app.voice.VoiceSensitivity
 import ch.beachscore.app.voice.VoiceStatus
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 class FakeMatchStore(var saved: PersistedMatch? = null) : MatchStore {
@@ -79,5 +89,56 @@ class FakeVoice : VoiceControl {
 
     fun hear(text: String, verdict: Verdict, minConfidence: Double? = 1.0) {
         check(heard.tryEmit(Heard(text, minConfidence, verdict)))
+    }
+}
+
+class FakeHistoryStore : HistoryStore {
+    val records = MutableStateFlow<List<MatchRecord>>(emptyList())
+    override val matches: Flow<List<MatchRecord>> = records.map { list -> list.sortedByDescending { it.startedAt } }
+    private var nextId = 1L
+
+    override suspend fun add(record: MatchRecord): Long {
+        val id = nextId++
+        records.update { it + record.copy(id = id) }
+        return id
+    }
+
+    override suspend fun assignLineup(ids: List<Long>, lineup: Lineup) {
+        records.update { list -> list.map { if (it.id in ids) it.copy(lineup = lineup) else it } }
+    }
+
+    override suspend fun delete(ids: List<Long>) {
+        records.update { list -> list.filterNot { it.id in ids } }
+    }
+}
+
+class FakePlayerStore(vararg names: String) : PlayerStore {
+    val all = MutableStateFlow(names.mapIndexed { i, n -> Player(i + 1L, n, archived = false) })
+    override val players: Flow<List<Player>> = all.map { list -> list.sortedBy { it.name.lowercase() } }
+
+    override suspend fun add(rawName: String): AddPlayerResult {
+        val list = all.value
+        return when (val check = PlayerNames.check(rawName, list)) {
+            is NameCheck.Ok -> {
+                PlayerNames.archivedWithName(check.name, list)?.let { a ->
+                    all.update { l -> l.map { if (it.id == a.id) it.copy(archived = false) else it } }
+                    return AddPlayerResult.Revived(a.copy(archived = false))
+                }
+                val p = Player((list.maxOfOrNull { it.id } ?: 0) + 1, check.name, false)
+                all.update { it + p }
+                AddPlayerResult.Added(p)
+            }
+            else -> AddPlayerResult.Rejected(check)
+        }
+    }
+
+    override suspend fun rename(id: Long, rawName: String): NameCheck {
+        val check = PlayerNames.check(rawName, all.value, renaming = id)
+        if (check is NameCheck.Ok) all.update { l -> l.map { if (it.id == id) it.copy(name = check.name) else it } }
+        return check
+    }
+
+    override suspend fun archive(id: Long) {
+        all.update { l -> l.map { if (it.id == id) it.copy(archived = true) else it } }
     }
 }

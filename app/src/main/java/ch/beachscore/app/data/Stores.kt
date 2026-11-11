@@ -1,5 +1,6 @@
 package ch.beachscore.app.data
 
+import ch.beachscore.app.history.Lineup
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
@@ -30,6 +31,8 @@ data class PersistedMatch(
     val state: MatchState,
     /** Swap state: true when Blue is shown on the left (the initial layout). */
     val blueOnLeft: Boolean = true,
+    /** Players per team; kept across matches until changed. */
+    val lineup: Lineup = Lineup(),
 )
 
 interface MatchStore {

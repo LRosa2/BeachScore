@@ -22,6 +22,12 @@ import ch.beachscore.app.voice.Heard
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceControl
+import ch.beachscore.app.data.AddPlayerResult
+import ch.beachscore.app.data.HistoryStore
+import ch.beachscore.app.data.PlayerStore
+import ch.beachscore.app.history.Lineup
+import ch.beachscore.app.history.MatchCloser
+import ch.beachscore.app.history.Player
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +55,10 @@ class ScoreboardViewModel(
     private val hardwareKeys: HardwareKeyInput = HardwareKeyInput(),
     private val voice: VoiceControl? = null,
     extraInputs: List<ScoreInput> = emptyList(),
+    private val history: HistoryStore? = null,
+    private val players: PlayerStore? = null,
+    /** Wall-clock ms for history times (the tap lock uses the monotonic [clock]). */
+    private val wallClock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
     private val touch = TouchInput()
@@ -62,6 +72,7 @@ class ScoreboardViewModel(
     private var foreground = false
     private var micPermission = false
     private var heardJob: Job? = null
+    private var allPlayers: Map<Long, Player> = emptyMap()
 
     private val _uiState = MutableStateFlow(ScoreboardUiState())
     val uiState: StateFlow<ScoreboardUiState> = _uiState.asStateFlow()
@@ -88,6 +99,7 @@ class ScoreboardViewModel(
                 }
             }
             if (voice != null) launch { voice.heard.collect(::onHeard) }
+            if (players != null) launch { players.players.collect(::onPlayers) }
             updateListening()
             launch {
                 merge(touch.commands, hardwareKeys.commands, *extraInputs.map { it.commands }.toTypedArray())
@@ -124,8 +136,42 @@ class ScoreboardViewModel(
         reduce(MatchEvent.NextSet)
     }
 
+    /**
+     * Both "New match" buttons: the match is written to history (finished sets only; nothing if
+     * none) and a fresh one starts. Lineups stay for the next match.
+     */
     fun onNewMatch() {
+        val current = match ?: return
+        val record = MatchCloser.close(current.state, current.lineup, wallClock())
+        if (record != null && history != null) viewModelScope.launch { history.add(record) }
         if (reduce(MatchEvent.NewMatch)) endLock()
+    }
+
+    /** Lineup picker tap; see [Lineup.toggle]. Applies to the whole running match. */
+    fun togglePlayer(team: Team, playerId: Long) {
+        val current = match ?: return
+        val lineup = current.lineup.toggle(team, playerId)
+        if (lineup == current.lineup) return
+        store(current.copy(lineup = lineup))
+        publish()
+    }
+
+    /** "Add player" in the picker; a new (or revived) player joins [team] if there is room. */
+    fun addPlayer(name: String, team: Team?, onResult: (AddPlayerResult) -> Unit) {
+        val store = players ?: return
+        viewModelScope.launch {
+            val result = store.add(name)
+            val added = when (result) {
+                is AddPlayerResult.Added -> result.player
+                is AddPlayerResult.Revived -> result.player
+                is AddPlayerResult.Rejected -> null
+            }
+            if (added != null) {
+                allPlayers = allPlayers + (added.id to added)
+                if (team != null) togglePlayer(team, added.id)
+            }
+            onResult(result)
+        }
     }
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -182,7 +228,7 @@ class ScoreboardViewModel(
         // Blocked while the set-won overlay is up; must not start a lock either.
         if (current.state.setFinished) return Verdict.Rejected(RejectReason.SET_WON)
         if (!tapLock.tryAcquire()) return Verdict.Rejected(RejectReason.LOCKED)
-        reduce(MatchEvent.PointFor(team))
+        reduce(MatchEvent.PointFor(team, wallClock()))
         startLock(team)
         return Verdict.Accepted(command)
     }
@@ -199,6 +245,18 @@ class ScoreboardViewModel(
             delay(HEARD_VISIBLE_MS)
             _uiState.update { it.copy(voice = it.voice.copy(lastHeard = null)) }
         }
+    }
+
+    private fun onPlayers(list: List<Player>) {
+        allPlayers = list.associateBy { it.id }
+        val current = match
+        if (current != null) {
+            // Archived players leave the running lineup (they stay in old matches).
+            val archived = list.filter { it.archived }.map { it.id }.toSet()
+            val lineup = current.lineup.without(archived)
+            if (lineup != current.lineup) store(current.copy(lineup = lineup))
+        }
+        publish()
     }
 
     private fun updateListening() {
@@ -275,7 +333,10 @@ class ScoreboardViewModel(
     private fun publish(loaded: Boolean? = null) {
         val m = match ?: return
         val score = m.state.score
-        fun teamUi(team: Team) = TeamUi(team, score.points(team), score.sets(team))
+        fun teamUi(team: Team) = TeamUi(
+            team, score.points(team), score.sets(team),
+            players = m.lineup.of(team).map { allPlayers[it] ?: Player(it, "?", archived = false) },
+        )
         val leftTeam = teamOn(Side.LEFT, m)
         _uiState.update {
             it.copy(
@@ -283,6 +344,8 @@ class ScoreboardViewModel(
                 left = teamUi(leftTeam),
                 right = teamUi(leftTeam.other),
                 canUndo = m.state.canUndo,
+                lineup = m.lineup,
+                activePlayers = allPlayers.values.filterNot { it.archived }.sortedBy { p -> p.name.lowercase() },
                 setWon = score.setWinner?.let { w -> SetWonUi(w, score.points(w), score.points(w.other)) },
                 settings = settings,
             )
