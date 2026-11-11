@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ch.beachscore.app.score.Language
+import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.VoiceSensitivity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -38,6 +39,7 @@ class SettingsRepository(
             prefs[VOICE_COMMANDS] = new.voiceCommands
             prefs[VOICE_SENSITIVITY] = new.voiceSensitivity.name
             prefs[SHOW_HEARD] = new.showHeard
+            prefs[MICROPHONE] = new.microphone?.encode() ?: ""
         }
     }
 
@@ -53,6 +55,7 @@ class SettingsRepository(
             voiceSensitivity = VoiceSensitivity.entries.firstOrNull { it.name == this[VOICE_SENSITIVITY] }
                 ?: defaults.voiceSensitivity,
             showHeard = this[SHOW_HEARD] ?: defaults.showHeard,
+            microphone = MicChoice.decode(this[MICROPHONE]),
         ).sanitized()
     }
 
@@ -65,5 +68,6 @@ class SettingsRepository(
         val VOICE_COMMANDS = booleanPreferencesKey("voice_commands")
         val VOICE_SENSITIVITY = stringPreferencesKey("voice_sensitivity")
         val SHOW_HEARD = booleanPreferencesKey("show_heard")
+        val MICROPHONE = stringPreferencesKey("microphone")
     }
 }

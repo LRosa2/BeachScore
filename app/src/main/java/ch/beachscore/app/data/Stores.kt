@@ -4,6 +4,7 @@ import ch.beachscore.app.history.Lineup
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
+import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.VoiceSensitivity
 import kotlinx.coroutines.flow.Flow
 
@@ -18,6 +19,8 @@ data class Settings(
     val voiceSensitivity: VoiceSensitivity = VoiceSensitivity.NORMAL,
     /** Diagnostics line with the last heard phrase (only while voice commands are on). */
     val showHeard: Boolean = true,
+    /** Preferred input for voice commands; null is "Automatic" (Android's routing). */
+    val microphone: MicChoice? = null,
 ) {
     /** Brings values read from disk back into the ranges the UI offers. */
     fun sanitized(): Settings = copy(

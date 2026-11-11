@@ -16,6 +16,8 @@ import ch.beachscore.app.score.Language
 import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.speech.Speaker
 import ch.beachscore.app.voice.Heard
+import ch.beachscore.app.voice.InputDevice
+import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceControl
 import ch.beachscore.app.voice.VoiceSensitivity
@@ -75,10 +77,19 @@ class FakeVoice : VoiceControl {
     var startCount = 0
         private set
 
-    override fun start(language: Language, sensitivity: VoiceSensitivity) {
-        if (listening == language to sensitivity) return
+    override val microphones = MutableStateFlow<List<InputDevice>>(emptyList())
+    val active = MutableStateFlow<InputDevice?>(null)
+    override val activeMicrophone: StateFlow<InputDevice?> = active
+
+    /** Microphone choice of the last start() (null: automatic). */
+    var microphone: MicChoice? = null
+        private set
+
+    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?) {
+        if (listening == language to sensitivity && this.microphone == microphone) return
+        if (listening != language to sensitivity) startCount++
         listening = language to sensitivity
-        startCount++
+        this.microphone = microphone
         status.value = VoiceStatus.Listening
     }
 

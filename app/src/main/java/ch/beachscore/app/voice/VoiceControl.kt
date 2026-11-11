@@ -24,7 +24,16 @@ interface VoiceControl {
     val heard: Flow<Heard>
     val status: StateFlow<VoiceStatus>
 
-    /** Starts (or reconfigures) listening; idempotent for the same arguments. */
-    fun start(language: Language, sensitivity: VoiceSensitivity)
+    /** Connected audio inputs (all kinds; [Microphones.selectable] picks the offered ones). */
+    val microphones: StateFlow<List<InputDevice>>
+
+    /** The input the recorder is actually routed to while listening, else null. */
+    val activeMicrophone: StateFlow<InputDevice?>
+
+    /**
+     * Starts (or reconfigures) listening; idempotent for the same arguments. A new
+     * [microphone] (null: automatic) is applied without reloading the model.
+     */
+    fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice? = null)
     fun stop()
 }

@@ -6,6 +6,7 @@ import ch.beachscore.app.history.Player
 import ch.beachscore.app.score.Team
 import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.voice.Heard
+import ch.beachscore.app.voice.InputDevice
 import ch.beachscore.app.voice.VoiceStatus
 
 data class TeamUi(val team: Team, val points: Int, val sets: Int, val players: List<Player> = emptyList())
@@ -42,4 +43,8 @@ data class VoiceUi(
     val status: VoiceStatus = VoiceStatus.Off,
     val lastHeard: Heard? = null,
     val heardSeq: Int = 0,
+    /** Connected inputs, for the "Microphone" setting. */
+    val microphones: List<InputDevice> = emptyList(),
+    /** The input actually in use while listening (shown in settings and the indicator). */
+    val activeMicrophone: InputDevice? = null,
 )

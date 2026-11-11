@@ -14,6 +14,9 @@ import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.score.Score
 import ch.beachscore.app.score.Team
+import ch.beachscore.app.voice.InputDevice
+import ch.beachscore.app.voice.MicChoice
+import ch.beachscore.app.voice.MicKind
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceSensitivity
@@ -228,5 +231,30 @@ class ScoreboardViewModelVoiceTest {
     fun `voice status is exposed for the mic indicator`() = runTest {
         val vm = viewModel()
         assertEquals(ch.beachscore.app.voice.VoiceStatus.Listening, vm.ui.voice.status)
+    }
+
+    @Test
+    fun `microphone choice goes to the voice input, also while listening`() = runTest {
+        viewModel()
+        assertNull(voice.microphone, "automatic by default")
+        val receiver = MicChoice(MicKind.USB, "Wireless Mic Rx")
+        settingsStore.update { it.copy(microphone = receiver) }
+        assertEquals(receiver, voice.microphone)
+        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening, "still listening")
+        settingsStore.update { it.copy(microphone = null) }
+        assertNull(voice.microphone)
+    }
+
+    @Test
+    fun `connected and routed microphones are shown`() = runTest {
+        val vm = viewModel()
+        val phone = InputDevice(3, MicKind.BUILTIN, "moto g15 power")
+        val usb = InputDevice(31, MicKind.USB, "Wireless Mic Rx")
+        voice.microphones.value = listOf(phone, usb)
+        voice.active.value = usb
+        assertEquals(listOf(phone, usb), vm.ui.voice.microphones)
+        assertEquals(usb, vm.ui.voice.activeMicrophone)
+        voice.active.value = phone
+        assertEquals(phone, vm.ui.voice.activeMicrophone, "receiver unplugged: back on the phone")
     }
 }
