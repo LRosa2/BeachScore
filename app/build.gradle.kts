@@ -5,6 +5,8 @@ import java.util.zip.ZipInputStream
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -17,8 +19,8 @@ android {
         applicationId = "ch.beachscore.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 3
+        versionName = "3.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -53,6 +55,11 @@ android {
         getByName("test").kotlin.directories += "src/sharedTest/java"
         getByName("androidTest").kotlin.directories += "src/sharedTest/java"
     }
+}
+
+room {
+    // Exported schemas are committed, so later migrations can be tested against them.
+    schemaDirectory("$projectDir/schemas")
 }
 
 // --- Vosk speech models ------------------------------------------------------------------------
@@ -153,6 +160,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.vosk.android)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
@@ -167,4 +176,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.junit4)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.room.testing)
 }

@@ -14,6 +14,10 @@ androidxTestRunner = "1.7.0"
 androidxTestExtJunit = "1.3.0"
 # Offline speech recognition (phase 2). Latest release on Maven Central, checked 2026-11-11.
 vosk = "0.3.75"
+# Phase 3 history database. KSP 2.3.13 has a known regression with concurrent runs; 2.3.12 is
+# the version proven with this AGP/Kotlin combination in the sibling project.
+ksp = "2.3.12"
+room = "2.8.5"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -36,8 +40,14 @@ junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+room = { id = "androidx.room", version.ref = "room" }
