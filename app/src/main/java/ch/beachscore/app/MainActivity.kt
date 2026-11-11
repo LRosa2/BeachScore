@@ -38,9 +38,10 @@ class MainActivity : ComponentActivity() {
         // from the first frame on every API level from 26.
         val app = newBase.applicationContext as BeachScoreApp
         uiLanguage = runBlocking { app.container.settingsRepository.settings.first().language }
-        val config = Configuration(newBase.resources.configuration)
-        config.setLocale(Locale.forLanguageTag(uiLanguage.tag))
-        super.attachBaseContext(newBase.createConfigurationContext(config))
+        super.attachBaseContext(newBase)
+        // A delta that only overrides the locale: screen size, orientation etc. keep following
+        // the device. Must be applied before anything touches the activity's resources.
+        applyOverrideConfiguration(Configuration().apply { setLocale(Locale.forLanguageTag(uiLanguage.tag)) })
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
