@@ -214,7 +214,12 @@ Field test: commands worked only after silence. Any noise or speech directly bef
 after made the result "[unk] punkt blau" (dropped), and continuous noise kept Vosk from
 ending the utterance at all. At a court there is never silence, so:
 
-- **Grammar**: both word orders of each point phrase, the undo word, and `[unk]`.
+- **Grammar**: both word orders of each point phrase, the undo word, about 150 ordinary
+  *decoy* words (frequent words, court words, numbers, and words that sound like the
+  command words — but no exact homophones such as "read"/"red"), and `[unk]`. With only
+  the commands and `[unk]`, the small German model heard ordinary chatter as command words
+  with full confidence ("zurück" 1.00 in "Satz Blau, fünfzehn, zwölf"); the decoys give it
+  something else to hear.
 - **Spotting**: a command counts anywhere in a final result when its words are adjacent:
   the point word next to a team word in either order, or the undo word. `[unk]` and other
   words around it do not matter, and only the command words need the confidence
@@ -224,13 +229,18 @@ ending the utterance at all. At a court there is never silence, so:
   point anyway. Two different commands ("punkt blau punkt rot", "zurück, punkt rot") give
   none (shown as "two commands"): guessing which one was meant could score the wrong
   team, and a missed command costs only a tap.
-- **Embedded undo**: the undo word with other words or `[unk]` around it must reach
-  confidence 0.95 whatever the sensitivity. A single word is easily heard into chatter;
-  a missed undo costs a tap, a wrong one removes a real point.
+- **Commands inside speech** (`RejectReason.IN_SPEECH`, shown as "in speech"):
+  - Undo counts only with nothing but `[unk]` (noise) around it. Measured: with the
+    decoys, "zurück"/"undo" inside ordinary sentences ("der Ball kam zurück über das
+    Netz", "can you undo the knot") is heard correctly *and* with confidence 1.00, so no
+    threshold can tell it from a command; only isolation can. A missed undo costs a tap.
+  - A point counts only with at most 4 other words (not `[unk]`) before it in the same
+    result. A command phrase after a long stretch of talk is almost always talk (or two
+    sentences meeting: "… das Team in Rot. Punkte …"). Words after it do not matter.
 - **Not waiting for silence**: the partial result is checked after every 100 ms of
   audio. When it contains a command and either something follows the command or the
   partial has stayed the same for 200 ms (600 ms for undo, so that "zurück zum Auto"
-  shows its following words and becomes an embedded undo), the recogniser is asked for its
+  shows its following words and is rejected as inside speech), the recogniser is asked for its
   final result at once (with word confidences), which also starts a new utterance. The
   final result then goes through the rules above. A normal pause still ends an utterance
   as before.
@@ -241,6 +251,19 @@ ending the utterance at all. At a court there is never silence, so:
   sentences, between noise bursts, under continuous noise and chatter, and both; and
   chatter containing the command words separately or not adjacent, plus the undo word in
   ordinary sentences.
+
+  | `VoiceSpottingTest` (emulator)           | 3.1.0            | 3.2.0                       |
+  |------------------------------------------|------------------|-----------------------------|
+  | command between sentences (46)           | 0                | 34                          |
+  | command between noise bursts (46)        | 30               | 46                          |
+  | command under continuous noise+chatter   | 28               | 33                          |
+  | sentences around + continuous noise      | 0                | 29                          |
+  | end of command → accepted               | median 830 ms    | median 240 ms, max 930 ms   |
+  | chatter streams giving a command (144)   | 20 (Normal)      | 4 (Normal)                  |
+  | wrong command                            | 0                | 0                           |
+
+  The 46 commands per condition include 16 in reversed word order, which 3.1.0 never
+  accepted.
 
 ### Diagnostics (this is what makes the court test useful)
 

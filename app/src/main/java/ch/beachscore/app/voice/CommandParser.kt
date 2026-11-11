@@ -23,7 +23,7 @@ object CommandParser {
 
     const val UNKNOWN_WORD = "[unk]"
 
-    /** See the class comment. 4 kept chatter triggers rare (3 of 144) and lost 1 of 46 commands said right after a sentence. */
+    /** See the class comment. With 4, chatter gave a command in 4 of 144 streams (3.1.0: 20). */
     const val MAX_WORDS_BEFORE_POINT = 4
 
     private class Words(val point: String, val blue: String, val red: String, val undo: String)
