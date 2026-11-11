@@ -3,6 +3,8 @@ package ch.beachscore.app.ui
 import ch.beachscore.app.data.Settings
 import ch.beachscore.app.score.Team
 import ch.beachscore.app.speech.SpeechAvailability
+import ch.beachscore.app.voice.Heard
+import ch.beachscore.app.voice.VoiceStatus
 
 data class TeamUi(val team: Team, val points: Int, val sets: Int)
 
@@ -22,4 +24,15 @@ data class ScoreboardUiState(
     val lastPoint: PointFlash? = null,
     val settings: Settings = Settings(),
     val speech: SpeechAvailability = SpeechAvailability.UNKNOWN,
+    val voice: VoiceUi = VoiceUi(),
+)
+
+/**
+ * Voice diagnostics: [status] drives the mic indicator; [lastHeard] is the fading "what was
+ * heard" line (null when hidden or switched off). [heardSeq] changes with every new line.
+ */
+data class VoiceUi(
+    val status: VoiceStatus = VoiceStatus.Off,
+    val lastHeard: Heard? = null,
+    val heardSeq: Int = 0,
 )

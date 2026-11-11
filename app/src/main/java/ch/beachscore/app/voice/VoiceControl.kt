@@ -1,0 +1,30 @@
+package ch.beachscore.app.voice
+
+import ch.beachscore.app.score.Language
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+
+sealed interface VoiceStatus {
+    data object Off : VoiceStatus
+
+    /** Copying the speech model to internal storage on first use. */
+    data class Preparing(val progress: Float) : VoiceStatus
+    data object Listening : VoiceStatus
+
+    /** Listening, but results are ignored because the app's own announcement is playing. */
+    data object Muted : VoiceStatus
+    data class Failed(val reason: Reason) : VoiceStatus {
+        enum class Reason { MODEL, MICROPHONE }
+    }
+}
+
+/** What the view model needs from the voice input: results with verdicts, status, on/off. */
+interface VoiceControl {
+    /** Every non-empty final result, already checked by [CommandParser] and the echo guard. */
+    val heard: Flow<Heard>
+    val status: StateFlow<VoiceStatus>
+
+    /** Starts (or reconfigures) listening; idempotent for the same arguments. */
+    fun start(language: Language, sensitivity: VoiceSensitivity)
+    fun stop()
+}

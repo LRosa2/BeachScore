@@ -18,6 +18,10 @@ import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.score.ScoreEngine
 import ch.beachscore.app.score.Team
 import ch.beachscore.app.speech.Speaker
+import ch.beachscore.app.voice.Heard
+import ch.beachscore.app.voice.RejectReason
+import ch.beachscore.app.voice.Verdict
+import ch.beachscore.app.voice.VoiceControl
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +47,7 @@ class ScoreboardViewModel(
     private val speaker: Speaker,
     clock: () -> Long,
     private val hardwareKeys: HardwareKeyInput = HardwareKeyInput(),
+    private val voice: VoiceControl? = null,
     extraInputs: List<ScoreInput> = emptyList(),
 ) : ViewModel() {
 
@@ -53,6 +58,10 @@ class ScoreboardViewModel(
     private var settings = Settings()
     private var unlockJob: Job? = null
     private var flashSeq = 0
+
+    private var foreground = false
+    private var micPermission = false
+    private var heardJob: Job? = null
 
     private val _uiState = MutableStateFlow(ScoreboardUiState())
     val uiState: StateFlow<ScoreboardUiState> = _uiState.asStateFlow()
@@ -75,16 +84,28 @@ class ScoreboardViewModel(
                     applySettings(it)
                     syncTarget()
                     publish()
+                    updateListening()
                 }
             }
+            if (voice != null) launch { voice.heard.collect(::onHeard) }
+            updateListening()
             launch {
                 merge(touch.commands, hardwareKeys.commands, *extraInputs.map { it.commands }.toTypedArray())
-                    .collect(::handle)
+                    .collect { handle(it) }
             }
         }
         viewModelScope.launch {
             speaker.availability.collect { availability -> _uiState.update { it.copy(speech = availability) } }
         }
+        if (voice != null) {
+            viewModelScope.launch {
+                voice.status.collect { status -> _uiState.update { it.copy(voice = it.voice.copy(status = status)) } }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        voice?.stop()
     }
 
     // --- UI entry points -------------------------------------------------------------------
@@ -111,6 +132,18 @@ class ScoreboardViewModel(
         viewModelScope.launch { settingsStore.update(transform) }
     }
 
+    /** Activity started/stopped: voice listens only while the scoreboard is in the foreground. */
+    fun onForegroundChanged(inForeground: Boolean) {
+        foreground = inForeground
+        updateListening()
+    }
+
+    /** Current RECORD_AUDIO grant, checked by the activity on start and after a request. */
+    fun onMicPermission(granted: Boolean) {
+        micPermission = granted
+        updateListening()
+    }
+
     /** Settings "Test voice": speaks the current score even when announcements are off. */
     fun onTestVoice() {
         val score = match?.state?.score ?: return
@@ -119,18 +152,53 @@ class ScoreboardViewModel(
 
     // --- internals --------------------------------------------------------------------------
 
-    private fun handle(command: ScoreCommand) {
-        val current = match ?: return
-        when (command) {
-            is ScoreCommand.Point -> {
-                // Blocked while the set-won overlay is up; must not start a lock either.
-                if (current.state.setFinished) return
-                if (!tapLock.tryAcquire()) return
-                val team = teamOn(command.side, current)
-                reduce(MatchEvent.PointFor(team))
-                startLock(team)
-            }
-            ScoreCommand.Undo -> if (reduce(MatchEvent.Undo)) endLock()
+    /** Runs one command from any source; the verdict feeds the voice diagnostics line. */
+    private fun handle(command: ScoreCommand): Verdict {
+        val current = match ?: return Verdict.Rejected(RejectReason.UNKNOWN)
+        return when (command) {
+            is ScoreCommand.Point -> point(teamOn(command.side, current), command)
+            is ScoreCommand.TeamPoint -> point(command.team, command)
+            ScoreCommand.Undo ->
+                if (reduce(MatchEvent.Undo)) {
+                    endLock()
+                    Verdict.Accepted(command)
+                } else {
+                    Verdict.Rejected(RejectReason.NOTHING_TO_UNDO)
+                }
+        }
+    }
+
+    private fun point(team: Team, command: ScoreCommand): Verdict {
+        val current = match ?: return Verdict.Rejected(RejectReason.UNKNOWN)
+        // Blocked while the set-won overlay is up; must not start a lock either.
+        if (current.state.setFinished) return Verdict.Rejected(RejectReason.SET_WON)
+        if (!tapLock.tryAcquire()) return Verdict.Rejected(RejectReason.LOCKED)
+        reduce(MatchEvent.PointFor(team))
+        startLock(team)
+        return Verdict.Accepted(command)
+    }
+
+    private fun onHeard(heard: Heard) {
+        val verdict = when (val v = heard.verdict) {
+            is Verdict.Accepted -> handle(v.command)
+            is Verdict.Rejected -> v
+        }
+        if (!settings.showHeard) return
+        heardJob?.cancel()
+        _uiState.update { it.copy(voice = it.voice.copy(lastHeard = heard.copy(verdict = verdict), heardSeq = it.voice.heardSeq + 1)) }
+        heardJob = viewModelScope.launch {
+            delay(HEARD_VISIBLE_MS)
+            _uiState.update { it.copy(voice = it.voice.copy(lastHeard = null)) }
+        }
+    }
+
+    private fun updateListening() {
+        val voice = voice ?: return
+        val want = match != null && settings.voiceCommands && foreground && micPermission
+        if (want) voice.start(settings.language, settings.voiceSensitivity) else voice.stop()
+        if (!want || !settings.showHeard) {
+            heardJob?.cancel()
+            _uiState.update { it.copy(voice = it.voice.copy(lastHeard = null)) }
         }
     }
 
@@ -205,5 +273,10 @@ class ScoreboardViewModel(
                 settings = settings,
             )
         }
+    }
+
+    companion object {
+        /** How long the "what was heard" line stays before it fades. */
+        const val HEARD_VISIBLE_MS = 4000L
     }
 }

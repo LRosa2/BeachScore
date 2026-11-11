@@ -1,5 +1,6 @@
 package ch.beachscore.app.input
 
+import ch.beachscore.app.score.Team
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -8,7 +9,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 enum class Side { LEFT, RIGHT }
 
 sealed interface ScoreCommand {
+    /** A point for the team shown on [side] (touch, hardware keys). */
     data class Point(val side: Side) : ScoreCommand
+
+    /** A point for a named team (voice), independent of Swap sides. */
+    data class TeamPoint(val team: Team) : ScoreCommand
+
     data object Undo : ScoreCommand
 }
 

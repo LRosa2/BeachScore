@@ -3,6 +3,7 @@ package ch.beachscore.app.data
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
+import ch.beachscore.app.voice.VoiceSensitivity
 import kotlinx.coroutines.flow.Flow
 
 data class Settings(
@@ -11,6 +12,11 @@ data class Settings(
     val language: Language = Language.EN,
     val tapLockMs: Long = TapLock.DEFAULT_MS,
     val hardwareButtons: Boolean = false,
+    /** Phase 2: listen for spoken commands. Off by default; needs RECORD_AUDIO. */
+    val voiceCommands: Boolean = false,
+    val voiceSensitivity: VoiceSensitivity = VoiceSensitivity.NORMAL,
+    /** Diagnostics line with the last heard phrase (only while voice commands are on). */
+    val showHeard: Boolean = true,
 ) {
     /** Brings values read from disk back into the ranges the UI offers. */
     fun sanitized(): Settings = copy(
