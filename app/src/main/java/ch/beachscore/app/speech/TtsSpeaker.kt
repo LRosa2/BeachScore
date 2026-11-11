@@ -3,7 +3,9 @@ package ch.beachscore.app.speech
 import android.content.Context
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import ch.beachscore.app.score.Language
+import ch.beachscore.app.voice.EchoGuard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +18,7 @@ import java.util.Locale
  *
  * Lives as long as the process (see AppContainer), so an activity restart does not re-init TTS.
  */
-class TtsSpeaker(context: Context) : Speaker {
+class TtsSpeaker(context: Context, private val echoGuard: EchoGuard? = null) : Speaker {
 
     private val _availability = MutableStateFlow(SpeechAvailability.UNKNOWN)
     override val availability: StateFlow<SpeechAvailability> = _availability.asStateFlow()
@@ -38,6 +40,15 @@ class TtsSpeaker(context: Context) : Speaker {
     }
 
     init {
+        // Tells the voice input when our own announcement plays, so it is not taken as a command.
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String) = Unit
+            override fun onDone(utteranceId: String) { echoGuard?.utteranceFinished(utteranceId) }
+            override fun onStop(utteranceId: String, interrupted: Boolean) { echoGuard?.utteranceFinished(utteranceId) }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String) { echoGuard?.utteranceFinished(utteranceId) }
+            override fun onError(utteranceId: String, errorCode: Int) { echoGuard?.utteranceFinished(utteranceId) }
+        })
         tts.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -55,7 +66,10 @@ class TtsSpeaker(context: Context) : Speaker {
     override fun speak(text: String, language: Language) {
         if (!ready) return
         if (applied != language && !applyLanguage(language)) return
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "beachscore-${utteranceId++}")
+        val id = "beachscore-${utteranceId++}"
+        // Mute from the request on, not from onStart: the first syllable must not slip through.
+        echoGuard?.utteranceStarted(id)
+        if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) echoGuard?.utteranceFinished(id)
     }
 
     @Synchronized

@@ -105,19 +105,31 @@ class CommandParserTest {
 
     @Test
     fun `real recogniser output with unicode and escapes`() {
-        // Layout as printed by the recogniser with setWords(true); raw UTF-8 or \u escapes.
+        // Captured from vosk-android 0.3.75 + vosk-model-small-de-0.15 (VoiceRecognitionTest, de__tts__undo).
         val recorded = """{
   "result" : [{
       "conf" : 1.000000,
-      "end" : 1.410000,
-      "start" : 0.900000,
+      "end" : 0.930000,
+      "start" : 0.300000,
       "word" : "zurück"
     }],
   "text" : "zurück"
 }"""
         assertEquals(ScoreCommand.Undo, command(parse(recorded, Language.DE)))
+        // The same with \u escapes, which other Vosk builds emit.
         val escaped = """{"result":[{"conf":1.0,"word":"zurück"}],"text":"zurück"}"""
         assertEquals(ScoreCommand.Undo, command(parse(escaped, Language.DE)))
+    }
+
+    @Test
+    fun `measured near misses are rejected at every sensitivity`() {
+        // From VoiceRecognitionTest with noise: "point green" heard as "point blue" 0.62,
+        // "Punkt Grün" as "punkt rot" 0.66, our own "Satz Blau, …" as "zurück" 0.61.
+        for (s in VoiceSensitivity.entries) {
+            assertEquals(RejectReason.LOW_CONFIDENCE, reason(parse(json("point" to 1.0, "blue" to 0.62), sensitivity = s)))
+            assertEquals(RejectReason.LOW_CONFIDENCE, reason(parse(json("punkt" to 1.0, "rot" to 0.66), Language.DE, s)))
+            assertEquals(RejectReason.LOW_CONFIDENCE, reason(parse(json("zurück" to 0.61), Language.DE, s)))
+        }
     }
 
     @Test

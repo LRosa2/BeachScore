@@ -14,6 +14,12 @@ import ch.beachscore.app.input.HardwareKeyInput
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.speech.TtsSpeaker
 import ch.beachscore.app.ui.ScoreboardViewModel
+import ch.beachscore.app.voice.EchoGuard
+import ch.beachscore.app.voice.ModelStore
+import ch.beachscore.app.voice.VoiceInput
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import java.util.Locale
 
 // Two files: a corrupt match file is replaced by an empty one (fresh match) and never touches
@@ -36,9 +42,16 @@ class AppContainer(context: Context) {
     // Locale.getDefault() is the device language: the app never changes the process default.
     val settingsRepository = SettingsRepository(app.settingsDataStore, Language.defaultFor(Locale.getDefault().language))
 
-    val speaker by lazy { TtsSpeaker(app) }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** Shared by TTS (reports when it speaks) and the voice input (ignores itself meanwhile). */
+    val echoGuard = EchoGuard(clock = SystemClock::elapsedRealtime)
+
+    val speaker by lazy { TtsSpeaker(app, echoGuard) }
 
     val hardwareKeys = HardwareKeyInput()
+
+    val voiceInput by lazy { VoiceInput(app, ModelStore(app), echoGuard, appScope) }
 
     val viewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
@@ -48,6 +61,7 @@ class AppContainer(context: Context) {
                 speaker = speaker,
                 clock = SystemClock::elapsedRealtime,
                 hardwareKeys = hardwareKeys,
+                voice = voiceInput,
             )
         }
     }

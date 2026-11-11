@@ -6,13 +6,17 @@ import ch.beachscore.app.input.ScoreCommand
  * "Voice sensitivity" setting. Every word of a command must reach [minConfidence] (Vosk
  * per-word confidence, 0..1). All tuning lives here.
  *
- * With a closed grammar Vosk reports ~1.0 for clearly spoken commands; values drop when the
- * audio is faint, noisy or only partly matches. See VoiceRecognitionTest for measured values.
+ * Measured with VoiceRecognitionTest (real Vosk, bundled small models, 68 speech samples, clean
+ * and 20 dB quieter with noise): correctly heard commands score 1.00 (one quiet "undo" 0.60).
+ * Near misses score 0.61-0.66: "point green" -> "point blue" 0.62, "Punkt Gruen" -> "punkt rot"
+ * 0.66, and our own "Satz Blau, fuenfzehn, zwoelf" -> "zurueck" 0.61. Even RELAXED therefore
+ * stays above 0.66. Raise towards STRICT if wrong points appear at the court, lower to RELAXED
+ * if clear commands are shown as "low confidence".
  */
 enum class VoiceSensitivity(val minConfidence: Double) {
-    STRICT(0.92),
-    NORMAL(0.80),
-    RELAXED(0.60),
+    STRICT(0.95),
+    NORMAL(0.85),
+    RELAXED(0.70),
 }
 
 /** Why a heard phrase did not score. */

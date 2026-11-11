@@ -3,15 +3,16 @@ package ch.beachscore.app.voice
 /**
  * A Vosk final result: the recognised text and, with `setWords(true)`, each word with its
  * confidence. [parse] reads the recogniser's JSON with a few regular expressions (no JSON
- * library, so it runs unchanged in JVM tests); the format is fixed by Vosk.
+ * library, so it runs unchanged in JVM tests); the format is fixed by Vosk. Braces and brackets
+ * are always escaped: Android's ICU regex engine rejects a bare `}` that Java accepts.
  */
 data class VoskResult(val text: String, val words: List<Word>) {
     data class Word(val word: String, val confidence: Double)
 
     companion object {
         private val TEXT = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-        private val RESULT_ARRAY = Regex(""""result"\s*:\s*\[(.*?)]""", RegexOption.DOT_MATCHES_ALL)
-        private val OBJECT = Regex("""\{([^{}]*)}""")
+        private val RESULT_ARRAY = Regex(""""result"\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
+        private val OBJECT = Regex("""\{([^\{\}]*)\}""")
         private val WORD = Regex(""""word"\s*:\s*"((?:[^"\\]|\\.)*)"""")
         private val CONF = Regex(""""conf"\s*:\s*([0-9.eE+-]+)""")
 
