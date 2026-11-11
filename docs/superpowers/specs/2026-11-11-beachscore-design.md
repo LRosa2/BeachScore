@@ -232,3 +232,101 @@ the range test; there is no separate throwaway spike.
 
 Clap detection, custom wake words, renaming teams, voice "next set" / "new match",
 training on the players' voices, Swiss German dialect support.
+
+## Phase 3 — match history, players and statistics (added 2026-11-11, in scope now)
+
+Phases 1 and 2 are built and on the user's phone. The user wants to keep a record of
+games so the group can look at statistics afterwards.
+
+### Matches
+
+- A history entry is a **match**: one or more finished sets played with the same
+  lineups.
+- The set-won overlay gets a second button "New match" next to "Next set". It saves the
+  match (including the set just won) and starts a fresh match at 0:0 with zero sets.
+  Both buttons are equally large: the user plays single-set matches as often as
+  multi-set ones.
+- The existing hold-to-reset "New match" in the control strip also saves the match
+  before resetting.
+- Only finished sets are saved. An unfinished trailing set is dropped. A match with no
+  finished set creates no history entry.
+- A match is written to history at the moment it is closed (either "New match"). The
+  running match keeps living in the existing DataStore state as today, extended with
+  the data history needs: match start time, per finished set its score, start/end time
+  and point sequence, and the current lineups. Undo across a set win must keep this
+  consistent (undoing the set-winning point removes that finished set again).
+- Stored per match: id, start time, end time (time of last finished set), target at the
+  time of each set, players per team (0–2 each), and its sets. Per set: index, Blue
+  points, Red points, start/end time, and the point sequence as a compact string of
+  `B`/`R` in scoring order.
+- Match result: the team with more sets wins; equal sets is a draw.
+- Voice: no new voice commands. "New match" stays touch only.
+
+### Players
+
+- Player list screen: add, rename, remove. Names are unique ignoring case and
+  surrounding spaces; empty names rejected. Removing archives the player: hidden from
+  pickers and the list, still shown in old matches and statistics.
+- Lineup before a game: each half of the scoreboard shows a name area near the top
+  (with the sets indicator). Empty state shows a subtle "Players" hint. Tapping it opens
+  a picker with the active players as large chips; pick up to two for that team; a
+  player cannot be on both teams (picking them for one team removes them from the
+  other). The picker also offers "Add player" inline. The name area is a deliberate,
+  separate tap target that never scores a point; keep it small enough that the score
+  tap area stays dominant, and it follows the team on Swap sides.
+- Lineups persist across matches until changed. Changing a lineup mid-match is allowed
+  and applies to the whole running match (lineups are per match, not per set).
+- History editing: open a match to set or correct its players with the same picker.
+  Long-press in the history enters multi-select; actions "Assign players" (sets both
+  teams' lineups on all selected matches) and "Delete" (with confirmation).
+- Announcements and voice commands keep using Blue/Red (Blau/Rot), never player names.
+
+### History screen
+
+- List, newest first, grouped by day: time, both lineups (or "No players"), set scores
+  (e.g. 15:12, 13:15), result highlight for the winning side.
+- Match detail: lineups (editable), sets with scores and durations, delete match.
+- Reached from a new "History" button in the control strip. From the history screen:
+  "Statistics", "Players", "Export CSV". These screens may use normal (non-immersive
+  tolerant) layouts but stay landscape; Back returns to the scoreboard.
+
+### Statistics
+
+- Period filter: Today, Last 30 days, This year, All time (default All time).
+- Per player: matches, wins, losses, draws, win rate (wins / matches), sets won/lost,
+  points for/against and difference. Sortable by at least win rate and matches;
+  default sort by win rate, then matches.
+- Per pair: same figures for each unordered pair that played together as a
+  two-player team.
+- Head-to-head: choose a player or a pair; list each opposing player (or pair) with the
+  record against them.
+- A match counts for a player if that player is in its lineup. A match with a lineup on
+  only one side counts for that side's players (and pair) but has no head-to-head.
+  Matches with no players are excluded and the screen says how many were excluded.
+- All figures come from one pure, unit-tested calculator over a list of matches.
+
+### CSV export
+
+- One row per set. Columns: match_id, match_start (ISO local date-time), set_number,
+  blue_player_1, blue_player_2, red_player_1, red_player_2, blue_points, red_points,
+  set_winner, set_duration_seconds, match_winner, point_sequence.
+- Semicolon-separated, UTF-8 with BOM, CRLF line ends, fields quoted when needed, so it
+  opens directly in Excel with Swiss/German regional settings.
+- Exports the whole history (or the selection when in multi-select) through the Android
+  share sheet using a FileProvider and a cache file. No storage permission.
+
+### Technical
+
+- Room database for matches, sets and players (KSP). Schema version 1 exported;
+  repositories expose Flows. Existing DataStore keeps settings and the running match;
+  migrate the persisted running-match format so an in-progress match on the user's
+  phone survives the update (missing new fields get sensible defaults).
+- Pure, JVM-tested units: match-closing logic (running match → history record or
+  nothing), statistics calculator, CSV writer, player-name validation.
+- No new permissions, no network. German and English strings for everything new.
+
+### Out of scope
+
+Cloud sync or sharing between phones, import, charts, per-point statistics screens
+(the point sequence is only stored and exported), player photos, team names, editing
+set scores after the fact, voice control of any of this.
