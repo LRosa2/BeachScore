@@ -228,6 +228,37 @@ the range test; there is no separate throwaway spike.
 - Audio source should favour far-field pickup (compare `VOICE_RECOGNITION` with the
   default source; choose one and note why).
 
+### Microphone choice (added 2026-11-11)
+
+Use case: the phone lies at the sideline, a Bluetooth speaker (normal media playback, no
+call mode) and the transmitter of a wireless clip-on microphone are at the net post, and
+the microphone's USB-C receiver is plugged into the phone.
+
+- Setting "Microphone" under Voice commands: "Automatic" (default; Android's own routing,
+  the behaviour before this setting existed) plus one entry per connected input that
+  makes sense: the phone's built-in microphone, USB audio devices/headsets and wired
+  headsets. Several built-in microphones (bottom, back, ...) are shown as one entry.
+  Bluetooth microphones are left out: they need call-mode (SCO) routing, which would
+  also take over the speaker. Entries show a readable name: type plus product name.
+- The choice is stored as type + product name, so the same USB receiver matches again
+  when it is plugged in later. A stored choice that is not connected stays visible in
+  the list as "not connected".
+- The choice is applied as the preferred input device of the recorder. While listening,
+  devices being plugged in and out are followed: when the chosen device disappears,
+  recording falls back to Automatic and keeps listening; when it comes back, it is used
+  again. A read error from a vanished device reopens the microphone instead of ending
+  in a "failed" state.
+- The microphone actually in use (the routed device, not the preference) is shown in
+  the Microphone row ("In use: USB · ...") and compactly in the mic indicator on the
+  scoreboard ("USB", "Phone", "Headset"), so it can be checked at the court.
+- Capture format: the recogniser needs 16 kHz mono 16-bit. If a device cannot be opened
+  at that format, the recorder is opened at a format the device offers (its own sample
+  rate, mono or stereo) and converted in the app (downmix to mono, low-pass and
+  resample to 16 kHz). The conversion and the choice of format are pure functions with
+  JVM tests; device selection (device list -> options, stored choice -> device,
+  fallback) too.
+- No new permission.
+
 ### Out of scope
 
 Clap detection, custom wake words, renaming teams, voice "next set" / "new match",
