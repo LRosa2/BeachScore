@@ -47,6 +47,8 @@ import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.speech.SpeechAvailability
+import ch.beachscore.app.voice.VoiceSensitivity
+import ch.beachscore.app.voice.VoiceStatus
 import java.util.Locale
 
 /**
@@ -58,6 +60,9 @@ import java.util.Locale
 fun SettingsSheet(
     settings: Settings,
     speech: SpeechAvailability,
+    voice: VoiceUi,
+    voicePermissionDenied: Boolean,
+    onVoiceToggle: (Boolean) -> Unit,
     speechNoticeDismissed: Boolean,
     onDismissSpeechNotice: () -> Unit,
     onChange: ((Settings) -> Settings) -> Unit,
@@ -135,6 +140,8 @@ fun SettingsSheet(
                     Text(stringResource(R.string.hardware_buttons_hint), style = MaterialTheme.typography.bodySmall)
                 }
 
+                VoiceSection(settings, voice, voicePermissionDenied, onVoiceToggle, onChange)
+
                 OutlinedButton(onClick = onTestVoice, modifier = Modifier.testTag("test_voice")) { Text(stringResource(R.string.test_voice)) }
             }
         }
@@ -176,5 +183,62 @@ private fun TapLockSlider(valueMs: Long, onChange: (Long) -> Unit) {
             modifier = Modifier.testTag("tap_lock"),
         )
         Text(stringResource(R.string.tap_lock_hint), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VoiceSection(
+    settings: Settings,
+    voice: VoiceUi,
+    permissionDenied: Boolean,
+    onVoiceToggle: (Boolean) -> Unit,
+    onChange: ((Settings) -> Settings) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column {
+            SwitchRow(R.string.voice_commands, settings.voiceCommands, "voice", onVoiceToggle)
+            Text(stringResource(R.string.voice_commands_hint), style = MaterialTheme.typography.bodySmall)
+        }
+        if (permissionDenied && !settings.voiceCommands) {
+            Text(
+                stringResource(R.string.voice_permission_denied),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.testTag("voice_permission_denied"),
+            )
+        }
+        if (!settings.voiceCommands) return@Column
+
+        when (val status = voice.status) {
+            is VoiceStatus.Preparing -> Text(stringResource(R.string.voice_preparing, (status.progress * 100).toInt()))
+            is VoiceStatus.Failed -> Text(
+                stringResource(
+                    if (status.reason == VoiceStatus.Failed.Reason.MODEL) R.string.voice_failed_model else R.string.voice_failed_microphone,
+                ),
+                color = MaterialTheme.colorScheme.error,
+            )
+            else -> Unit
+        }
+
+        Labeled(R.string.voice_sensitivity) {
+            val levels = listOf(
+                VoiceSensitivity.STRICT to R.string.voice_sensitivity_strict,
+                VoiceSensitivity.NORMAL to R.string.voice_sensitivity_normal,
+                VoiceSensitivity.RELAXED to R.string.voice_sensitivity_relaxed,
+            )
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                levels.forEachIndexed { i, (level, label) ->
+                    SegmentedButton(
+                        selected = settings.voiceSensitivity == level,
+                        onClick = { onChange { it.copy(voiceSensitivity = level) } },
+                        shape = SegmentedButtonDefaults.itemShape(i, levels.size),
+                        modifier = Modifier.testTag("sensitivity_${level.name.lowercase()}"),
+                    ) { Text(stringResource(label)) }
+                }
+            }
+        }
+        Text(stringResource(R.string.voice_sensitivity_hint), style = MaterialTheme.typography.bodySmall)
+        SwitchRow(R.string.show_heard, settings.showHeard, "show_heard") { on -> onChange { it.copy(showHeard = on) } }
     }
 }

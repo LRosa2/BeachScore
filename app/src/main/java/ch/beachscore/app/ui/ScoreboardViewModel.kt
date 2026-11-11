@@ -138,9 +138,18 @@ class ScoreboardViewModel(
         updateListening()
     }
 
-    /** Current RECORD_AUDIO grant, checked by the activity on start and after a request. */
+    /** Current RECORD_AUDIO grant, checked by the activity whenever it starts. */
     fun onMicPermission(granted: Boolean) {
         micPermission = granted
+        if (granted) _uiState.update { it.copy(voicePermissionDenied = false) }
+        updateListening()
+    }
+
+    /** Answer to the permission request started by switching "Voice commands" on. */
+    fun onMicPermissionResult(granted: Boolean) {
+        micPermission = granted
+        _uiState.update { it.copy(voicePermissionDenied = !granted) }
+        if (granted) updateSettings { it.copy(voiceCommands = true) }
         updateListening()
     }
 
@@ -194,6 +203,11 @@ class ScoreboardViewModel(
 
     private fun updateListening() {
         val voice = voice ?: return
+        if (match != null && settings.voiceCommands && foreground && !micPermission) {
+            // Revoked in the system settings while voice was on: switch off and explain.
+            _uiState.update { it.copy(voicePermissionDenied = true) }
+            updateSettings { it.copy(voiceCommands = false) }
+        }
         val want = match != null && settings.voiceCommands && foreground && micPermission
         if (want) voice.start(settings.language, settings.voiceSensitivity) else voice.stop()
         if (!want || !settings.showHeard) {

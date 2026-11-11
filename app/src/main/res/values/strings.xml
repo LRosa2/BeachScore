@@ -29,4 +29,31 @@
 
     <string name="language_de" translatable="false">Deutsch</string>
     <string name="language_en" translatable="false">English</string>
+
+    <!-- Phase 2: voice commands -->
+    <string name="voice_commands">Voice commands</string>
+    <string name="voice_commands_hint">Say “point blue”, “point red” or “undo”. Listens only while the scoreboard is open.</string>
+    <string name="voice_permission_denied">Voice commands need the microphone, so they stay off. To use them, allow the microphone for BeachScore and switch them on again.</string>
+    <string name="voice_sensitivity">Voice sensitivity</string>
+    <string name="voice_sensitivity_strict">Strict</string>
+    <string name="voice_sensitivity_normal">Normal</string>
+    <string name="voice_sensitivity_relaxed">Relaxed</string>
+    <string name="voice_sensitivity_hint">Strict: fewer wrong points. Relaxed: accepts less clear commands from further away.</string>
+    <string name="show_heard">Show what was heard</string>
+    <string name="voice_preparing">Preparing speech recognition … %1$d%%</string>
+    <string name="voice_failed_model">Speech recognition could not be loaded.</string>
+    <string name="voice_failed_microphone">The microphone is not available (used by another app?).</string>
+
+    <string name="mic_listening">Listening for voice commands</string>
+    <string name="mic_muted">Not listening during the announcement</string>
+    <string name="mic_preparing">Preparing speech recognition</string>
+    <string name="mic_failed">Voice commands not working</string>
+
+    <string name="heard_ok">OK</string>
+    <string name="reason_unknown">not a command</string>
+    <string name="reason_low_confidence">unsure</string>
+    <string name="reason_locked">locked</string>
+    <string name="reason_echo_guard">own announcement</string>
+    <string name="reason_set_won">set is over</string>
+    <string name="reason_nothing_to_undo">nothing to undo</string>
 </resources>

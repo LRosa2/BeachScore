@@ -1,5 +1,9 @@
 package ch.beachscore.app.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,6 +42,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -52,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import ch.beachscore.app.R
 import ch.beachscore.app.input.Side
 import ch.beachscore.app.score.Team
@@ -61,6 +67,19 @@ import ch.beachscore.app.score.Team
 fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var speechNoticeDismissed by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    // Asked only when the user switches voice commands on; never at start.
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.onMicPermissionResult(granted)
+    }
+    val onVoiceToggle: (Boolean) -> Unit = { on ->
+        when {
+            !on -> viewModel.updateSettings { it.copy(voiceCommands = false) }
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED ->
+                viewModel.onMicPermissionResult(granted = true)
+            else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     ScoreboardScreen(
         state = state,
@@ -75,6 +94,9 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState) {
         SettingsSheet(
             settings = state.settings,
             speech = state.speech,
+            voice = state.voice,
+            voicePermissionDenied = state.voicePermissionDenied,
+            onVoiceToggle = onVoiceToggle,
             speechNoticeDismissed = speechNoticeDismissed,
             onDismissSpeechNotice = { speechNoticeDismissed = true },
             onChange = viewModel::updateSettings,
@@ -111,6 +133,7 @@ fun ScoreboardScreen(
                 }
             }
             LockBar(state, Modifier.align(Alignment.TopCenter))
+            VoiceIndicator(state.voice, Modifier.align(Alignment.TopCenter))
             ControlStrip(
                 canUndo = state.canUndo,
                 onUndo = onUndo,

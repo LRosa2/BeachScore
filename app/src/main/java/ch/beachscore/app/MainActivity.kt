@@ -1,6 +1,8 @@
 package ch.beachscore.app
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.Bundle
@@ -12,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -61,6 +64,20 @@ class MainActivity : ComponentActivity() {
                 ScoreboardRoute(viewModel, state)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Voice listens only while the scoreboard is visible (no background listening).
+        viewModel.onMicPermission(
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+        )
+        viewModel.onForegroundChanged(true)
+    }
+
+    override fun onStop() {
+        viewModel.onForegroundChanged(false)
+        super.onStop()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

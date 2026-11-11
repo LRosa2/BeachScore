@@ -25,6 +25,8 @@ data class ScoreboardUiState(
     val settings: Settings = Settings(),
     val speech: SpeechAvailability = SpeechAvailability.UNKNOWN,
     val voice: VoiceUi = VoiceUi(),
+    /** Voice commands could not be (or stay) on because the microphone permission is missing. */
+    val voicePermissionDenied: Boolean = false,
 )
 
 /**

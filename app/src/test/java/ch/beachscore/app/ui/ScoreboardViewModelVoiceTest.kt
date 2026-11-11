@@ -175,6 +175,28 @@ class ScoreboardViewModelVoiceTest {
     }
 
     @Test
+    fun `permission revoked while voice is on turns the setting off with an explanation`() = runTest {
+        val vm = viewModel(permission = false)
+        assertEquals(false, vm.ui.settings.voiceCommands)
+        assertEquals(true, vm.ui.voicePermissionDenied)
+        assertNull(voice.listening)
+    }
+
+    @Test
+    fun `granting the permission from the settings switch turns voice on`() = runTest {
+        settingsStore.update { it.copy(voiceCommands = false) }
+        val vm = viewModel(permission = false)
+        assertEquals(false, vm.ui.voicePermissionDenied, "nothing to explain while voice is off")
+        vm.onMicPermissionResult(granted = false)
+        assertEquals(false, vm.ui.settings.voiceCommands)
+        assertEquals(true, vm.ui.voicePermissionDenied)
+        vm.onMicPermissionResult(granted = true)
+        assertEquals(true, vm.ui.settings.voiceCommands)
+        assertEquals(false, vm.ui.voicePermissionDenied)
+        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+    }
+
+    @Test
     fun `voice off by default never starts listening`() = runTest {
         settingsStore.update { Settings(language = Language.EN) }
         viewModel()

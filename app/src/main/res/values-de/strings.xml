@@ -24,4 +24,31 @@
     <string name="test_voice">Stimme testen</string>
     <string name="speech_unavailable">Sprachausgabe ist für diese Sprache auf diesem Gerät nicht verfügbar. Die Anzeige funktioniert trotzdem. Für die Ansage eine Stimme in den System-Einstellungen für Text-in-Sprache installieren.</string>
     <string name="ok">OK</string>
+
+    <!-- Phase 2: Sprachbefehle -->
+    <string name="voice_commands">Sprachbefehle</string>
+    <string name="voice_commands_hint">„Punkt Blau“, „Punkt Rot“ oder „zurück“ sagen. Hört nur zu, solange die Anzeige offen ist.</string>
+    <string name="voice_permission_denied">Sprachbefehle brauchen das Mikrofon und bleiben deshalb aus. Zum Verwenden das Mikrofon für BeachScore erlauben und wieder einschalten.</string>
+    <string name="voice_sensitivity">Empfindlichkeit</string>
+    <string name="voice_sensitivity_strict">Streng</string>
+    <string name="voice_sensitivity_normal">Normal</string>
+    <string name="voice_sensitivity_relaxed">Locker</string>
+    <string name="voice_sensitivity_hint">Streng: weniger falsche Punkte. Locker: nimmt auch undeutlichere Befehle aus grösserer Entfernung an.</string>
+    <string name="show_heard">Gehörtes anzeigen</string>
+    <string name="voice_preparing">Spracherkennung wird vorbereitet … %1$d %%</string>
+    <string name="voice_failed_model">Die Spracherkennung konnte nicht geladen werden.</string>
+    <string name="voice_failed_microphone">Das Mikrofon ist nicht verfügbar (von einer anderen App belegt?).</string>
+
+    <string name="mic_listening">Hört auf Sprachbefehle</string>
+    <string name="mic_muted">Hört während der Ansage nicht zu</string>
+    <string name="mic_preparing">Spracherkennung wird vorbereitet</string>
+    <string name="mic_failed">Sprachbefehle funktionieren nicht</string>
+
+    <string name="heard_ok">OK</string>
+    <string name="reason_unknown">kein Befehl</string>
+    <string name="reason_low_confidence">unsicher</string>
+    <string name="reason_locked">gesperrt</string>
+    <string name="reason_echo_guard">eigene Ansage</string>
+    <string name="reason_set_won">Satz ist beendet</string>
+    <string name="reason_nothing_to_undo">nichts zum Zurücknehmen</string>
 </resources>
