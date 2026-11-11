@@ -160,3 +160,75 @@ Decision: voice commands, not claps. A ball contact sounds much like a clap, and
 
 Phase 1 must not include any Vosk dependency, microphone permission or voice UI — only
 the `ScoreInput` seam that makes phase 2 an addition rather than a rewrite.
+
+## Phase 2 — detailed design (added 2026-11-11, in scope now)
+
+Phase 1 is built and running on the user's phone (moto g15 power, Android 15). Phase 2
+is built as the real feature with built-in diagnostics, so the first court session is
+the range test; there is no separate throwaway spike.
+
+### Behaviour
+
+- Setting "Voice commands" (default **off**). Turning it on requests `RECORD_AUDIO`;
+  if denied, the setting stays off and a short explanation is shown. No other new
+  permission; still no network permission.
+- While the setting is on and the scoreboard is in the foreground, the app listens
+  continuously. Listening stops when the app goes to the background and resumes when it
+  returns. No foreground service, no background listening.
+- Recognition language follows the app language (one model loaded at a time).
+- Commands — the complete phrase must be recognised in one final result:
+
+  | Action        | Deutsch       | English      |
+  |---------------|---------------|--------------|
+  | Point Blue    | "Punkt Blau"  | "point blue" |
+  | Point Red     | "Punkt Rot"   | "point red"  |
+  | Undo          | "zurück"      | "undo"       |
+
+- Voice names the **team** (colour), not the side, so it is unaffected by Swap sides.
+  This needs a team-addressed scoring command next to the existing side-addressed one.
+- Voice points go through the same TapLock as taps and keys. "Undo" is not locked.
+- Voice input is ignored while the set-won overlay is shown, except "undo". "Next set"
+  stays a touch action.
+- Feedback is the existing spoken score. Nothing extra is spoken for a recognised
+  command, and nothing at all for unrecognised speech.
+
+### False-trigger protection
+
+- Vosk recogniser constructed with a closed grammar: the command words for the active
+  language plus `[unk]`, so other speech maps to unknown instead of the nearest command.
+- Only final results count (not partials). The result must be exactly one command
+  phrase; anything containing `[unk]` or extra words is dropped.
+- Per-word confidence (enable word results) must be at or above a threshold for every
+  word. Setting "Voice sensitivity" with three levels (strict / normal / relaxed) maps
+  to thresholds; pick sensible defaults and keep them in one place for tuning.
+- Echo guard: audio results are discarded while the app's own TTS is speaking and for a
+  short tail afterwards (about 500 ms), driven by the TTS utterance start/done
+  callbacks. The recogniser is reset when the guard ends so a half-heard own
+  announcement cannot complete into a command.
+
+### Diagnostics (this is what makes the court test useful)
+
+- A small microphone indicator on the scoreboard while listening (and a distinct state
+  while muted by the echo guard or when the recogniser failed to start).
+- Setting "Show what was heard" (default on while voice commands are on): a small,
+  unobtrusive line showing the last recognised text, its lowest word confidence and
+  whether it was accepted or why it was rejected (unknown / low confidence / locked /
+  echo guard). It fades after a few seconds and never covers the digits.
+
+### Technical
+
+- `com.alphacephei:vosk-android` (current stable). Small German and small English
+  models bundled in the APK so the app stays fully offline; accept the larger APK.
+  Models are unpacked on first use; show progress and handle failure without crashing.
+- `VoiceInput : ScoreInput` owns the recogniser and audio capture; a pure
+  `CommandParser` turns a Vosk result (text + word confidences) plus language and
+  threshold into a command or a rejection reason. `CommandParser` and the echo-guard
+  gate are unit-tested on the JVM with recorded/hand-written result JSON; the Vosk and
+  microphone parts are thin and verified on device.
+- Audio source should favour far-field pickup (compare `VOICE_RECOGNITION` with the
+  default source; choose one and note why).
+
+### Out of scope
+
+Clap detection, custom wake words, renaming teams, voice "next set" / "new match",
+training on the players' voices, Swiss German dialect support.
