@@ -35,17 +35,43 @@ data class Score(
 enum class MatchChange { NONE, POINT, UNDO, NEXT_SET, NEW_MATCH, TARGET }
 
 /**
+ * A set as history records it, added to [MatchState.finishedSets] the moment it is won.
+ * [sequence] is the scoring order as `B`/`R` characters. Times are wall-clock milliseconds; null
+ * only for sets rebuilt from a match saved before phase 3 (times were not recorded then).
+ */
+data class FinishedSet(
+    val index: Int,
+    val bluePoints: Int,
+    val redPoints: Int,
+    val target: Int,
+    val startedAt: Long?,
+    val endedAt: Long?,
+    val sequence: String,
+) {
+    val winner: Team get() = if (bluePoints > redPoints) Team.BLUE else Team.RED
+
+    fun points(team: Team): Int = if (team == Team.BLUE) bluePoints else redPoints
+}
+
+/**
  * Immutable match state.
  *
  * [history] holds the [Score] before every accepted point of the current match, newest last,
  * so undo can step back across set wins and "next set". It is bounded by the match: a new
  * match clears it.
+ *
+ * For match history (phase 3) it also records [finishedSets], the running set's
+ * [currentSequence] and start time, and when the match started (its first point).
  */
 data class MatchState(
     val score: Score = Score(),
     val target: Int = DEFAULT_TARGET,
     val history: List<Score> = emptyList(),
     val lastChange: MatchChange = MatchChange.NONE,
+    val finishedSets: List<FinishedSet> = emptyList(),
+    val currentSequence: String = "",
+    val currentSetStartedAt: Long? = null,
+    val matchStartedAt: Long? = null,
 ) {
     val setFinished: Boolean get() = score.setWinner != null
     val canUndo: Boolean get() = history.isNotEmpty()
@@ -59,7 +85,8 @@ data class MatchState(
 }
 
 sealed interface MatchEvent {
-    data class PointFor(val team: Team) : MatchEvent
+    /** A point; [at] is wall-clock time in ms, recorded for history. */
+    data class PointFor(val team: Team, val at: Long = 0L) : MatchEvent
     data object Undo : MatchEvent
     data object NextSet : MatchEvent
     data object NewMatch : MatchEvent
