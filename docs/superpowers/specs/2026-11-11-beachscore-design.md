@@ -176,13 +176,14 @@ the range test; there is no separate throwaway spike.
   continuously. Listening stops when the app goes to the background and resumes when it
   returns. No foreground service, no background listening.
 - Recognition language follows the app language (one model loaded at a time).
-- Commands — the complete phrase must be recognised in one final result:
+- Commands (both word orders count; changed 2026-11-11, see "Spotting commands without
+  silence" below):
 
-  | Action        | Deutsch       | English      |
-  |---------------|---------------|--------------|
-  | Point Blue    | "Punkt Blau"  | "point blue" |
-  | Point Red     | "Punkt Rot"   | "point red"  |
-  | Undo          | "zurück"      | "undo"       |
+  | Action        | Deutsch                       | English                       |
+  |---------------|-------------------------------|-------------------------------|
+  | Point Blue    | "Punkt Blau" / "Blau Punkt"   | "point blue" / "blue point"   |
+  | Point Red     | "Punkt Rot" / "Rot Punkt"     | "point red" / "red point"     |
+  | Undo          | "zurück"                      | "undo"                        |
 
 - Voice names the **team** (colour), not the side, so it is unaffected by Swap sides.
   This needs a team-addressed scoring command next to the existing side-addressed one.
@@ -196,15 +197,50 @@ the range test; there is no separate throwaway spike.
 
 - Vosk recogniser constructed with a closed grammar: the command words for the active
   language plus `[unk]`, so other speech maps to unknown instead of the nearest command.
-- Only final results count (not partials). The result must be exactly one command
-  phrase; anything containing `[unk]` or extra words is dropped.
+- Only final results count (not partials), but a final result can be forced early (see
+  below). Originally the result had to be exactly one command phrase; that is replaced by
+  the spotting rules below.
 - Per-word confidence (enable word results) must be at or above a threshold for every
-  word. Setting "Voice sensitivity" with three levels (strict / normal / relaxed) maps
+  command word. Setting "Voice sensitivity" with three levels (strict / normal / relaxed) maps
   to thresholds; pick sensible defaults and keep them in one place for tuning.
 - Echo guard: audio results are discarded while the app's own TTS is speaking and for a
   short tail afterwards (about 500 ms), driven by the TTS utterance start/done
   callbacks. The recogniser is reset when the guard ends so a half-heard own
   announcement cannot complete into a command.
+
+### Spotting commands without silence (added 2026-11-11)
+
+Field test: commands worked only after silence. Any noise or speech directly before or
+after made the result "[unk] punkt blau" (dropped), and continuous noise kept Vosk from
+ending the utterance at all. At a court there is never silence, so:
+
+- **Grammar**: both word orders of each point phrase, the undo word, and `[unk]`.
+- **Spotting**: a command counts anywhere in a final result when its words are adjacent:
+  the point word next to a team word in either order, or the undo word. `[unk]` and other
+  words around it do not matter, and only the command words need the confidence
+  threshold. Command words that are not adjacent ("punkt … blau") are no command.
+- **More than one command in a result**: the same command repeated ("punkt blau, punkt
+  blau") counts once — people repeat themselves, and the tap lock would block a second
+  point anyway. Two different commands ("punkt blau punkt rot", "zurück, punkt rot") give
+  none (shown as "two commands"): guessing which one was meant could score the wrong
+  team, and a missed command costs only a tap.
+- **Embedded undo**: the undo word with other words or `[unk]` around it must reach
+  confidence 0.95 whatever the sensitivity. A single word is easily heard into chatter;
+  a missed undo costs a tap, a wrong one removes a real point.
+- **Not waiting for silence**: the partial result is checked after every 100 ms of
+  audio. When it contains a command and either something follows the command or the
+  partial has stayed the same for 200 ms (600 ms for undo, so that "zurück zum Auto"
+  shows its following words and becomes an embedded undo), the recogniser is asked for its
+  final result at once (with word confidences), which also starts a new utterance. The
+  final result then goes through the rules above. A normal pause still ends an utterance
+  as before.
+- **Diagnostics**: a command spotted inside a longer result is shown as "… punkt blau …"
+  (dots where other words were). A result that is only `[unk]` does not replace an
+  accepted command's line while it is still visible.
+- Measured with `VoiceSpottingTest` (instrumented, real Vosk): commands directly between
+  sentences, between noise bursts, under continuous noise and chatter, and both; and
+  chatter containing the command words separately or not adjacent, plus the undo word in
+  ordinary sentences.
 
 ### Diagnostics (this is what makes the court test useful)
 
