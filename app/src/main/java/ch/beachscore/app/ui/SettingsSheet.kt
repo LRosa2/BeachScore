@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -21,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -39,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +52,8 @@ import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.speech.SpeechAvailability
+import ch.beachscore.app.voice.MicRow
+import ch.beachscore.app.voice.Microphones
 import ch.beachscore.app.voice.VoiceSensitivity
 import ch.beachscore.app.voice.VoiceStatus
 import java.util.Locale
@@ -222,6 +228,8 @@ private fun VoiceSection(
             else -> Unit
         }
 
+        MicrophoneChoice(settings, voice, onChange)
+
         Labeled(R.string.voice_sensitivity) {
             val levels = listOf(
                 VoiceSensitivity.STRICT to R.string.voice_sensitivity_strict,
@@ -244,5 +252,40 @@ private fun VoiceSection(
         }
         Text(stringResource(R.string.voice_sensitivity_hint), style = MaterialTheme.typography.bodySmall)
         SwitchRow(R.string.show_heard, settings.showHeard, "show_heard") { on -> onChange { it.copy(showHeard = on) } }
+    }
+}
+
+/** "Microphone": Automatic plus each connected input, and the one actually in use. */
+@Composable
+private fun MicrophoneChoice(settings: Settings, voice: VoiceUi, onChange: ((Settings) -> Settings) -> Unit) {
+    Labeled(R.string.microphone) {
+        Column(Modifier.selectableGroup().testTag("microphone")) {
+            Microphones.rows(voice.microphones, settings.microphone).forEach { row -> MicrophoneRow(row, onChange) }
+        }
+        val inUse = voice.activeMicrophone?.let { micLabel(it.kind, it.productName) } ?: "–"
+        Text(
+            stringResource(R.string.microphone_in_use, inUse),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.testTag("microphone_in_use"),
+        )
+        Text(stringResource(R.string.microphone_hint), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun MicrophoneRow(row: MicRow, onChange: ((Settings) -> Settings) -> Unit) {
+    val choice = row.choice
+    val name = if (choice == null) stringResource(R.string.microphone_automatic) else micLabel(choice.kind, choice.productName)
+    val label = if (row.connected) name else stringResource(R.string.microphone_not_connected, name)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .selectable(selected = row.selected, role = Role.RadioButton) { onChange { it.copy(microphone = choice) } }
+            .testTag(if (choice == null) "mic_auto" else "mic_${choice.kind}_${choice.productName}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = row.selected, onClick = null, modifier = Modifier.padding(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }

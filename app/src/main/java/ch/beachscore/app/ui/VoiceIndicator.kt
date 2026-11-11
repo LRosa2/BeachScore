@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.beachscore.app.R
 import ch.beachscore.app.voice.Heard
+import ch.beachscore.app.voice.MicKind
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceStatus
@@ -74,6 +75,11 @@ fun VoiceIndicator(voice: VoiceUi, modifier: Modifier = Modifier) {
             },
             struckThrough = status is VoiceStatus.Failed || status == VoiceStatus.Muted,
         )
+        val mic = voice.activeMicrophone
+        if (mic != null && (status == VoiceStatus.Listening || status == VoiceStatus.Muted)) {
+            // Which microphone is live, so it can be checked at the court: "USB" vs "Phone".
+            Text(stringResource(micKindText(mic.kind)), color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, modifier = Modifier.testTag("mic_in_use"))
+        }
         if (status is VoiceStatus.Preparing) {
             Text("${(status.progress * 100).toInt()}%", color = Color.White, fontSize = 15.sp)
         }
@@ -119,4 +125,18 @@ private fun MicGlyph(color: Color, struckThrough: Boolean) {
         drawLine(color, Offset(w / 2, h * 0.75f), Offset(w / 2, h * 0.95f), stroke)
         if (struckThrough) drawLine(color, Offset(w * 0.1f, h * 0.05f), Offset(w * 0.9f, h * 0.95f), stroke)
     }
+}
+
+fun micKindText(kind: MicKind): Int = when (kind) {
+    MicKind.BUILTIN -> R.string.mic_kind_phone
+    MicKind.USB -> R.string.mic_kind_usb
+    MicKind.WIRED_HEADSET -> R.string.mic_kind_headset
+    MicKind.OTHER -> R.string.mic_kind_other
+}
+
+/** "USB · Wireless Mic Rx"; the type alone when the device has no product name. */
+@Composable
+fun micLabel(kind: MicKind, productName: String): String {
+    val type = stringResource(micKindText(kind))
+    return if (productName.isBlank()) type else "$type · ${productName.trim()}"
 }

@@ -48,6 +48,16 @@
     <string name="mic_muted">Not listening during the announcement</string>
     <string name="mic_preparing">Preparing speech recognition</string>
     <string name="mic_failed">Voice commands not working</string>
+    <!-- Microphone choice -->
+    <string name="microphone">Microphone</string>
+    <string name="microphone_automatic">Automatic</string>
+    <string name="microphone_hint">For a wireless clip-on microphone, plug its USB receiver into the phone and choose it here. Bluetooth microphones are not supported.</string>
+    <string name="microphone_not_connected">%1$s (not connected)</string>
+    <string name="microphone_in_use">In use: %1$s</string>
+    <string name="mic_kind_phone">Phone</string>
+    <string name="mic_kind_usb">USB</string>
+    <string name="mic_kind_headset">Headset</string>
+    <string name="mic_kind_other">Other</string>
 
     <string name="heard_ok">OK</string>
     <string name="reason_unknown">not a command</string>

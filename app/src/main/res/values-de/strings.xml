@@ -43,6 +43,16 @@
     <string name="mic_muted">Hört während der Ansage nicht zu</string>
     <string name="mic_preparing">Spracherkennung wird vorbereitet</string>
     <string name="mic_failed">Sprachbefehle funktionieren nicht</string>
+    <!-- Mikrofonwahl -->
+    <string name="microphone">Mikrofon</string>
+    <string name="microphone_automatic">Automatisch</string>
+    <string name="microphone_hint">Für ein drahtloses Ansteckmikrofon den USB-Empfänger am Telefon einstecken und hier wählen. Bluetooth-Mikrofone werden nicht unterstützt.</string>
+    <string name="microphone_not_connected">%1$s (nicht verbunden)</string>
+    <string name="microphone_in_use">In Verwendung: %1$s</string>
+    <string name="mic_kind_phone">Telefon</string>
+    <string name="mic_kind_usb">USB</string>
+    <string name="mic_kind_headset">Headset</string>
+    <string name="mic_kind_other">Andere</string>
 
     <string name="heard_ok">OK</string>
     <string name="reason_unknown">kein Befehl</string>
