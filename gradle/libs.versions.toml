@@ -12,6 +12,8 @@ junit = "6.1.3"
 junit4 = "4.13.2"
 androidxTestRunner = "1.7.0"
 androidxTestExtJunit = "1.3.0"
+# Offline speech recognition (phase 2). Latest release on Maven Central, checked 2026-11-11.
+vosk = "0.3.75"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +36,7 @@ junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

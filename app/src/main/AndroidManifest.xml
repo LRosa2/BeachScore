@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Phase 1 needs no permissions at all: fully offline, no network, no microphone. -->
+    <!-- Voice commands (phase 2). Requested at runtime only when the user turns
+         "Voice commands" on; with voice off the app asks for nothing. Still no network. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".BeachScoreApp"
