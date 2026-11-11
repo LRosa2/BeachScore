@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -234,7 +235,10 @@ private fun VoiceSection(
                         onClick = { onChange { it.copy(voiceSensitivity = level) } },
                         shape = SegmentedButtonDefaults.itemShape(i, levels.size),
                         modifier = Modifier.testTag("sensitivity_${level.name.lowercase()}"),
-                    ) { Text(stringResource(label)) }
+                        // No check mark: three labels must fit the narrow panel on one line.
+                        icon = {},
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                    ) { Text(stringResource(label), maxLines = 1, softWrap = false, fontSize = 14.sp) }
                 }
             }
         }
