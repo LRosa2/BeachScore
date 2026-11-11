@@ -197,6 +197,16 @@ class ScoreboardViewModelVoiceTest {
     }
 
     @Test
+    fun `listening pauses while history or statistics cover the scoreboard`() = runTest {
+        val vm = viewModel()
+        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+        vm.onScoreboardVisible(false)
+        assertNull(voice.listening)
+        vm.onScoreboardVisible(true)
+        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+    }
+
+    @Test
     fun `voice off by default never starts listening`() = runTest {
         settingsStore.update { Settings(language = Language.EN) }
         viewModel()
