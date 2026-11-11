@@ -21,8 +21,12 @@ enum class VoiceSensitivity(val minConfidence: Double) {
 
 /** Why a heard phrase did not score. */
 enum class RejectReason {
-    /** Not exactly one command phrase (contains [unk], extra or missing words). */
+    /** No command phrase in it (only [unk], or command words that are not adjacent). */
     UNKNOWN,
+    /** Two different commands in one result ("punkt blau, punkt rot"): none is acted on. */
+    MULTIPLE,
+    /** Undo with words around it, or a point after a long stretch of talk (see [CommandParser]). */
+    IN_SPEECH,
     LOW_CONFIDENCE,
     /** Heard while the app's own announcement was playing (or just after). */
     ECHO_GUARD,
@@ -44,4 +48,6 @@ data class Heard(
     /** Lowest per-word confidence, or null when the result had no word list. */
     val minConfidence: Double?,
     val verdict: Verdict,
+    /** What the diagnostics line shows: the spotted command, with "…" where other words were. */
+    val display: String = text,
 )

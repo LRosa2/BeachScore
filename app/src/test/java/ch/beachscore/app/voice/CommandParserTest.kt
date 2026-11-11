@@ -52,19 +52,97 @@ class CommandParserTest {
     }
 
     @Test
-    fun `unknown words reject the whole result`() {
-        assertEquals(RejectReason.UNKNOWN, reason(parse(json("[unk]" to 1.0))))
-        assertEquals(RejectReason.UNKNOWN, reason(parse(json("point" to 1.0, "blue" to 1.0, "[unk]" to 0.6))))
-        assertEquals(RejectReason.UNKNOWN, reason(parse(json("[unk]" to 0.7, "point" to 1.0, "red" to 1.0))))
+    fun `both word orders in both languages`() {
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("blue" to 1.0, "point" to 1.0))))
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json("red" to 1.0, "point" to 0.9))))
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("blau" to 1.0, "punkt" to 1.0), Language.DE)))
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json("rot" to 1.0, "punkt" to 1.0), Language.DE)))
     }
 
     @Test
-    fun `incomplete or extra words reject`() {
+    fun `unknown words alone are not a command`() {
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("[unk]" to 1.0))))
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("[unk]" to 1.0, "[unk]" to 0.4))))
+    }
+
+    @Test
+    fun `a command is spotted between other sounds and words`() {
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("point" to 1.0, "blue" to 1.0, "[unk]" to 0.6))))
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json("[unk]" to 0.7, "point" to 1.0, "red" to 1.0))))
+        assertEquals(
+            ScoreCommand.TeamPoint(Team.BLUE),
+            command(parse(json("[unk]" to 0.5, "[unk]" to 1.0, "blau" to 0.97, "punkt" to 1.0, "[unk]" to 0.3), Language.DE)),
+        )
+        // A stray command word next to the command does not matter.
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("point" to 0.4, "point" to 1.0, "blue" to 1.0))))
+    }
+
+    @Test
+    fun `only the command words need the confidence, not the words around them`() {
+        val heard = parse(json("[unk]" to 0.31, "punkt" to 0.99, "rot" to 0.95, "[unk]" to 0.2), Language.DE)
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(heard))
+        assertEquals(0.95, heard!!.minConfidence!!, 1e-9)
+        assertEquals(RejectReason.LOW_CONFIDENCE, reason(parse(json("[unk]" to 1.0, "punkt" to 1.0, "rot" to 0.7), Language.DE)))
+    }
+
+    @Test
+    fun `command words that are not adjacent are not a command`() {
         assertEquals(RejectReason.UNKNOWN, reason(parse(json("point" to 1.0))))
         assertEquals(RejectReason.UNKNOWN, reason(parse(json("blue" to 1.0))))
-        assertEquals(RejectReason.UNKNOWN, reason(parse(json("blue" to 1.0, "point" to 1.0))))
-        assertEquals(RejectReason.UNKNOWN, reason(parse(json("point" to 1.0, "blue" to 1.0, "point" to 1.0, "red" to 1.0))))
-        assertEquals(RejectReason.UNKNOWN, reason(parse(json("undo" to 1.0, "undo" to 1.0))))
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("point" to 1.0, "[unk]" to 1.0, "blue" to 1.0))))
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("blau" to 1.0, "[unk]" to 0.9, "[unk]" to 0.9, "punkt" to 1.0), Language.DE)))
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("blue" to 1.0, "red" to 1.0))))
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("point" to 1.0, "point" to 1.0))))
+    }
+
+    @Test
+    fun `the same command said twice counts once`() {
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("point" to 1.0, "blue" to 1.0, "point" to 1.0, "blue" to 1.0))))
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("punkt" to 1.0, "blau" to 1.0, "punkt" to 1.0), Language.DE)))
+        assertEquals(ScoreCommand.Undo, command(parse(json("undo" to 1.0, "undo" to 1.0))))
+    }
+
+    @Test
+    fun `different commands in one result give none`() {
+        assertEquals(RejectReason.MULTIPLE, reason(parse(json("point" to 1.0, "blue" to 1.0, "point" to 1.0, "red" to 1.0))))
+        // "blau punkt rot": blue and red share the word "punkt".
+        assertEquals(RejectReason.MULTIPLE, reason(parse(json("blau" to 1.0, "punkt" to 1.0, "rot" to 1.0), Language.DE)))
+        assertEquals(RejectReason.MULTIPLE, reason(parse(json("zurück" to 1.0, "[unk]" to 0.5, "punkt" to 1.0, "rot" to 1.0), Language.DE)))
+        assertEquals(RejectReason.MULTIPLE, reason(parse(json("undo" to 1.0, "point" to 1.0, "red" to 1.0))))
+    }
+
+    @Test
+    fun `undo counts only with nothing but noise around it`() {
+        for (s in VoiceSensitivity.entries) {
+            assertEquals(ScoreCommand.Undo, command(parse(json("zurück" to s.minConfidence), Language.DE, s)))
+            assertEquals(ScoreCommand.Undo, command(parse(json("[unk]" to 0.4, "zurück" to 1.0, "[unk]" to 1.0), Language.DE, s)))
+            // Measured: the real word in ordinary sentences is heard with confidence 1.00.
+            assertEquals(RejectReason.IN_SPEECH, reason(parse(json("der" to 1.0, "ball" to 1.0, "kann" to 1.0, "zurück" to 1.0, "über" to 1.0), Language.DE, s)))
+            assertEquals(RejectReason.IN_SPEECH, reason(parse(json("zurück" to 1.0, "zum" to 1.0, "auto" to 1.0), Language.DE, s)))
+            assertEquals(RejectReason.IN_SPEECH, reason(parse(json("can" to 1.0, "you" to 1.0, "undo" to 1.0), sensitivity = s)))
+        }
+    }
+
+    @Test
+    fun `a point after a long stretch of talk is talk`() {
+        val max = CommandParser.MAX_WORDS_BEFORE_POINT
+        val before = List(max) { "der" to 1.0 }.toTypedArray()
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json(*before, "punkt" to 1.0, "blau" to 1.0), Language.DE)))
+        assertEquals(RejectReason.IN_SPEECH, reason(parse(json(*before, "ja" to 1.0, "punkt" to 1.0, "blau" to 1.0), Language.DE)))
+        // Noise does not count as talk, and words after the command do not matter.
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json(*before, "[unk]" to 1.0, "[unk]" to 1.0, "red" to 1.0, "point" to 1.0, "nice" to 1.0, "one" to 1.0, "two" to 1.0, "three" to 1.0, "four" to 1.0, "five" to 1.0))))
+    }
+
+    @Test
+    fun `the heard line shows a spotted command with dots for the rest`() {
+        assertEquals("point blue", parse(json("point" to 1.0, "blue" to 1.0))!!.display)
+        assertEquals("… punkt blau", parse(json("[unk]" to 1.0, "punkt" to 1.0, "blau" to 1.0), Language.DE)!!.display)
+        assertEquals("rot punkt …", parse(json("rot" to 1.0, "punkt" to 1.0, "[unk]" to 1.0), Language.DE)!!.display)
+        assertEquals("… undo …", parse(json("[unk]" to 1.0, "undo" to 1.0, "[unk]" to 1.0))!!.display)
+        // Not a command: the whole text, as before.
+        assertEquals("[unk] point [unk]", parse(json("[unk]" to 1.0, "point" to 1.0, "[unk]" to 1.0))!!.display)
+        // Low confidence still shows where the command was.
+        assertEquals("… point red", parse(json("[unk]" to 1.0, "point" to 1.0, "red" to 0.5))!!.display)
     }
 
     @Test
@@ -133,6 +211,29 @@ class CommandParserTest {
     }
 
     @Test
+    fun `decoys are ordinary words, never command words or their homophones`() {
+        val commandWords = mapOf(
+            Language.EN to setOf("point", "blue", "red", "undo", "blew", "read"),
+            Language.DE to setOf("punkt", "blau", "rot", "zurück"),
+        )
+        for (language in Language.entries) {
+            val decoys = CommandParser.decoys(language)
+            assert(decoys.size > 100) { "$language: ${decoys.size}" }
+            assertEquals(decoys.size, decoys.toSet().size, "$language duplicates")
+            assertEquals(emptySet<String>(), decoys.toSet() intersect commandWords.getValue(language))
+            assert(decoys.all { it.matches(Regex("[a-zäöüß]+")) }) { language }
+        }
+    }
+
+    @Test
+    fun `decoy words around a command are other words`() {
+        val heard = parse(json("der" to 1.0, "punkt" to 1.0, "blau" to 1.0, "war" to 0.8), Language.DE)
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(heard))
+        assertEquals("… punkt blau …", heard!!.display)
+        assertEquals(RejectReason.UNKNOWN, reason(parse(json("die" to 1.0, "blaue" to 1.0, "mannschaft" to 1.0), Language.DE)))
+    }
+
+    @Test
     fun `malformed json is not a result`() {
         assertNull(VoskResult.parse("not json"))
         assertNull(VoskResult.parse("""{"result": [] }"""))
@@ -140,8 +241,12 @@ class CommandParserTest {
 
     @Test
     fun `grammar lists the phrases of one language plus unknown`() {
-        assertEquals(listOf("point blue", "point red", "undo", "[unk]"), CommandParser.grammar(Language.EN))
-        assertEquals(listOf("punkt blau", "punkt rot", "zurück", "[unk]"), CommandParser.grammar(Language.DE))
-        assertEquals("""["punkt blau","punkt rot","zurück","[unk]"]""", CommandParser.grammarJson(Language.DE))
+        assertEquals(listOf("point blue", "blue point", "point red", "red point", "undo"), CommandParser.grammar(Language.EN).take(5))
+        assertEquals(listOf("punkt blau", "blau punkt", "punkt rot", "rot punkt", "zurück"), CommandParser.grammar(Language.DE).take(5))
+        for (language in Language.entries) {
+            assertEquals("[unk]", CommandParser.grammar(language).last())
+            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(5).dropLast(1))
+        }
+        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","zurück","der",""")) 
     }
 }

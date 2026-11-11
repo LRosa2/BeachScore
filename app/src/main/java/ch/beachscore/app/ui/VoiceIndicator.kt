@@ -98,7 +98,7 @@ private fun HeardText(heard: Heard) {
     }
     val confidence = heard.minConfidence?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "–"
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("heard_line")) {
-        Text("“${heard.text}”", color = Color.White, fontSize = 15.sp)
+        Text("“${heard.display}”", color = Color.White, fontSize = 15.sp)
         Text(confidence, color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp)
         Text("$mark $label", color = color, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     }
@@ -106,6 +106,8 @@ private fun HeardText(heard: Heard) {
 
 private fun reasonText(reason: RejectReason): Int = when (reason) {
     RejectReason.UNKNOWN -> R.string.reason_unknown
+    RejectReason.MULTIPLE -> R.string.reason_multiple
+    RejectReason.IN_SPEECH -> R.string.reason_in_speech
     RejectReason.LOW_CONFIDENCE -> R.string.reason_low_confidence
     RejectReason.ECHO_GUARD -> R.string.reason_echo_guard
     RejectReason.LOCKED -> R.string.reason_locked

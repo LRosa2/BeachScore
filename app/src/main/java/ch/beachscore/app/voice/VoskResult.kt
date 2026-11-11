@@ -10,8 +10,9 @@ data class VoskResult(val text: String, val words: List<Word>) {
     data class Word(val word: String, val confidence: Double)
 
     companion object {
+        private val PARTIAL = Regex(""""partial"\s*:\s*"((?:[^"\\]|\\.)*)"""")
         private val TEXT = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-        private val RESULT_ARRAY = Regex(""""result"\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL)
+        private val RESULT_ARRAY = Regex(""""result"\s*:\s*\[(.*?)\]\s*[,\}]""", RegexOption.DOT_MATCHES_ALL) // not the ] of "[unk]"
         private val OBJECT = Regex("""\{([^\{\}]*)\}""")
         private val WORD = Regex(""""word"\s*:\s*"((?:[^"\\]|\\.)*)"""")
         private val CONF = Regex(""""conf"\s*:\s*([0-9.eE+-]+)""")
@@ -28,6 +29,9 @@ data class VoskResult(val text: String, val words: List<Word>) {
             }.orEmpty()
             return VoskResult(text.trim(), words)
         }
+
+        /** The text of a partial result (`{"partial" : "…"}`), or null if it is not one. */
+        fun parsePartial(json: String): String? = PARTIAL.find(json)?.groupValues?.get(1)?.let(::unescape)?.trim()
 
         private fun unescape(s: String): String {
             if ('\\' !in s) return s

@@ -57,6 +57,8 @@
     <string name="heard_ok">OK</string>
     <string name="reason_unknown">kein Befehl</string>
     <string name="reason_low_confidence">unsicher</string>
+    <string name="reason_multiple">zwei Befehle</string>
+    <string name="reason_in_speech">im Gespräch</string>
     <string name="reason_locked">gesperrt</string>
     <string name="reason_echo_guard">eigene Ansage</string>
     <string name="reason_set_won">Satz ist beendet</string>
