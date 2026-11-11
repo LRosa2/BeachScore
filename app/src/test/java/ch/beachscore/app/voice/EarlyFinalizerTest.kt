@@ -1,0 +1,79 @@
+package ch.beachscore.app.voice
+
+import ch.beachscore.app.score.Language
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class EarlyFinalizerTest {
+
+    private val ms = CommandRecognizer.SAMPLE_RATE / 1000
+
+    /** Feeds partial results every 100 ms; returns the time (ms) at which it asks to finalise, or null. */
+    private fun firstFinalise(f: EarlyFinalizer, vararg partials: String): Int? {
+        partials.forEachIndexed { i, p -> if (f.shouldFinalize(p, (i + 1) * 100L * ms)) return (i + 1) * 100 }
+        return null
+    }
+
+    @Test
+    fun `nothing happens without a command in the partial result`() {
+        val f = EarlyFinalizer(Language.DE)
+        assertEquals(null, firstFinalise(f, "", "[unk]", "[unk] punkt", "[unk] punkt", "[unk] punkt", "[unk] punkt [unk] blau", "[unk] punkt [unk] blau"))
+    }
+
+    @Test
+    fun `a point command at the end is finalised once it has been stable briefly`() {
+        val f = EarlyFinalizer(Language.DE)
+        // Heard first at 300 ms, unchanged at 400 and 500 ms.
+        assertEquals(300 + EarlyFinalizer.POINT_STABLE_MS, firstFinalise(f, "[unk]", "[unk] punkt", "[unk] punkt blau", "[unk] punkt blau", "[unk] punkt blau", "[unk] punkt blau"))
+    }
+
+    @Test
+    fun `a point command followed by anything is finalised at once`() {
+        val f = EarlyFinalizer(Language.EN)
+        assertEquals(300, firstFinalise(f, "point", "point red", "point red [unk]"))
+        f.reset()
+        assertEquals(200, firstFinalise(f, "blue", "blue point red"))
+    }
+
+    @Test
+    fun `undo waits longer, to see whether more speech follows`() {
+        val f = EarlyFinalizer(Language.DE)
+        assertEquals(100 + EarlyFinalizer.UNDO_STABLE_MS, firstFinalise(f, *Array(12) { "zurück" }))
+        f.reset()
+        assertEquals(300, firstFinalise(f, "zurück", "zurück", "zurück [unk]"))
+        assertTrue(EarlyFinalizer.UNDO_STABLE_MS > EarlyFinalizer.POINT_STABLE_MS)
+    }
+
+    @Test
+    fun `a changing partial restarts the wait`() {
+        val f = EarlyFinalizer(Language.EN)
+        assertFalse(f.shouldFinalize("point blue", 100L * ms))
+        assertFalse(f.shouldFinalize("[unk] point blue", 200L * ms))
+        assertFalse(f.shouldFinalize("[unk] point blue", (200L + EarlyFinalizer.POINT_STABLE_MS - 10) * ms))
+        assertTrue(f.shouldFinalize("[unk] point blue", (200L + EarlyFinalizer.POINT_STABLE_MS) * ms))
+    }
+
+    @Test
+    fun `after a reset it starts over`() {
+        val f = EarlyFinalizer(Language.EN)
+        f.shouldFinalize("undo", 100L * ms)
+        f.reset()
+        assertFalse(f.shouldFinalize("undo", 2000L * ms))
+    }
+
+    @Test
+    fun `words of the other language are ignored`() {
+        val f = EarlyFinalizer(Language.EN)
+        assertEquals(null, firstFinalise(f, "punkt blau", "punkt blau", "punkt blau", "punkt blau", "punkt blau", "punkt blau"))
+    }
+
+    @Test
+    fun `the partial result json is read`() {
+        assertEquals("punkt blau", VoskResult.parsePartial("{\n  \"partial\" : \"punkt blau\"\n}"))
+        assertEquals("", VoskResult.parsePartial("""{"partial" : ""}"""))
+        assertEquals("zurück", VoskResult.parsePartial("""{"partial":"zurück"}"""))
+        assertEquals(null, VoskResult.parsePartial("""{"text" : "x"}"""))
+    }
+}

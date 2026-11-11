@@ -20,15 +20,34 @@ class CommandRecognizer(
         setWords(true)
     }
 
-    /** Feeds 16-bit mono PCM; returns a verdict when Vosk ends an utterance, null otherwise. */
-    fun accept(samples: ShortArray, count: Int): Heard? =
-        if (recognizer.acceptWaveForm(samples, count)) parse(recognizer.result) else null
+    private val early = EarlyFinalizer(language)
+    private var fed = 0L
+
+    /**
+     * Feeds 16-bit mono PCM; returns a verdict when the utterance ends, null otherwise. It ends
+     * at a pause (Vosk's endpoint) or, without one, as soon as [EarlyFinalizer] sees a command
+     * in the partial result; the recogniser then starts a new utterance.
+     */
+    fun accept(samples: ShortArray, count: Int): Heard? {
+        fed += count
+        if (recognizer.acceptWaveForm(samples, count)) {
+            early.reset()
+            return parse(recognizer.result)
+        }
+        val partial = VoskResult.parsePartial(recognizer.partialResult) ?: return null
+        if (!early.shouldFinalize(partial, fed)) return null
+        early.reset()
+        return parse(recognizer.finalResult)
+    }
 
     /** Flushes what is left at the end of a stream (test files). */
     fun finish(): Heard? = parse(recognizer.finalResult)
 
     /** Drops everything heard so far (echo guard ended). */
-    fun reset() = recognizer.reset()
+    fun reset() {
+        early.reset()
+        recognizer.reset()
+    }
 
     /** Last raw JSON, for logging and for capturing test fixtures. */
     var lastJson: String? = null
