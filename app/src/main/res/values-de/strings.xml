@@ -121,4 +121,24 @@
     <string name="col_sets">Sätze</string>
     <string name="col_points">Punkte</string>
     <string name="col_diff">+/−</string>
+    <string name="voice_words">Sprachbefehle – %1$s</string>
+    <string name="voice_words_blue">Team Blau</string>
+    <string name="voice_words_red">Team Rot</string>
+    <string name="voice_words_point">Punkt</string>
+    <string name="voice_words_default">Standard: %1$s</string>
+    <string name="voice_words_reset">Zurücksetzen</string>
+    <string name="voice_words_reset_description">%1$s auf Standard zurücksetzen</string>
+    <string name="voice_words_save">Wörter speichern</string>
+    <string name="voice_words_hint">Mehrere Wörter mit Komma trennen. Kurze, häufige Wörter geben mehr falsche Punkte. Rückgängig bleibt „%1$s“.</string>
+    <string name="voice_words_checking">Prüfe die Wörter …</string>
+    <string name="voice_words_saved">Gespeichert.</string>
+    <string name="voice_words_unknown">Das Sprachmodell kennt „%1$s“ nicht. Nichts gespeichert.</string>
+    <string name="voice_words_duplicate">„%1$s“ steht in zwei Feldern. Nichts gespeichert.</string>
+    <string name="voice_words_undo">„%1$s“ ist das Wort für Rückgängig und kann nicht verwendet werden. Nichts gespeichert.</string>
+    <string name="voice_words_not_one_word">„%1$s“ ist kein einzelnes Wort. Nichts gespeichert.</string>
+    <string name="voice_words_model_unavailable">Das Sprachmodell konnte nicht geladen werden. Nichts gespeichert.</string>
+    <string name="menu">Menü</string>
+    <string name="about">Info</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_released">Veröffentlicht am %1$s</string>
 </resources>

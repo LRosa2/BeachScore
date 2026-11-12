@@ -120,6 +120,9 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, on
             onChange = viewModel::updateSettings,
             onTestVoice = viewModel::onTestVoice,
             onClose = { showSettings = false },
+            wordsSave = state.wordsSave,
+            onSaveWords = viewModel::saveVoiceWords,
+            onWordsEdited = viewModel::onVoiceWordsEdited,
         )
     }
 }

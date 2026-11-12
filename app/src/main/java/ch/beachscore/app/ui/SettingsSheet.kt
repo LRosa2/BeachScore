@@ -23,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -35,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,7 +59,12 @@ import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.voice.MicRow
 import ch.beachscore.app.voice.Microphones
 import ch.beachscore.app.voice.VoiceSensitivity
+import ch.beachscore.app.voice.CommandWords
+import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.VoiceStatus
+import ch.beachscore.app.voice.VoiceWords
+import ch.beachscore.app.voice.WordField
+import ch.beachscore.app.voice.WordProblem
 import java.util.Locale
 
 /**
@@ -75,6 +84,9 @@ fun SettingsSheet(
     onChange: ((Settings) -> Settings) -> Unit,
     onTestVoice: () -> Unit,
     onClose: () -> Unit,
+    wordsSave: WordsSave = WordsSave.Idle,
+    onSaveWords: (Language, Map<WordField, String>) -> Unit = { _, _ -> },
+    onWordsEdited: () -> Unit = {},
 ) {
     Box(
         Modifier
@@ -148,6 +160,7 @@ fun SettingsSheet(
                 }
 
                 VoiceSection(settings, voice, voicePermissionDenied, onVoiceToggle, onChange)
+                if (settings.voiceCommands) VoiceWordsEditor(settings, wordsSave, onSaveWords, onWordsEdited)
 
                 OutlinedButton(onClick = onTestVoice, modifier = Modifier.testTag("test_voice")) { Text(stringResource(R.string.test_voice)) }
             }
@@ -156,9 +169,9 @@ fun SettingsSheet(
 }
 
 @Composable
-private fun Labeled(label: Int, content: @Composable () -> Unit) {
+private fun Labeled(label: Int, vararg args: Any, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(label), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(label, *args), style = MaterialTheme.typography.titleMedium)
         content()
     }
 }
@@ -287,5 +300,85 @@ private fun MicrophoneRow(row: MicRow, onChange: ((Settings) -> Settings) -> Uni
     ) {
         RadioButton(selected = row.selected, onClick = null, modifier = Modifier.padding(8.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/**
+ * "Voice words" of the current app language: Blue team, Red team, Point. Empty = defaults
+ * (shown as the placeholder). "Save" stores all three after the checks; "Reset" empties one
+ * field and saves the same way.
+ */
+@Composable
+private fun VoiceWordsEditor(
+    settings: Settings,
+    save: WordsSave,
+    onSave: (Language, Map<WordField, String>) -> Unit,
+    onEdited: () -> Unit,
+) {
+    val language = settings.language
+    val stored = settings.voiceWords[language] ?: CustomWords()
+    val texts = remember(language, stored) {
+        mutableStateMapOf<WordField, String>().apply { WordField.entries.forEach { put(it, VoiceWords.display(stored[it])) } }
+    }
+    val defaults = CommandWords.defaultsOf(language)
+    val languageName = stringResource(if (language == Language.DE) R.string.language_de else R.string.language_en)
+    val fields = listOf(
+        WordField.BLUE to R.string.voice_words_blue,
+        WordField.RED to R.string.voice_words_red,
+        WordField.POINT to R.string.voice_words_point,
+    )
+    Labeled(R.string.voice_words, languageName) {
+        fields.forEach { (field, label) ->
+            val name = stringResource(label)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = texts[field].orEmpty(),
+                    onValueChange = { texts[field] = it; onEdited() },
+                    label = { Text(name) },
+                    placeholder = { Text(stringResource(R.string.voice_words_default, VoiceWords.display(defaults[field]))) },
+                    singleLine = true,
+                    enabled = save != WordsSave.Checking,
+                    modifier = Modifier.weight(1f).testTag("words_${field.name.lowercase()}"),
+                )
+                val resetDescription = stringResource(R.string.voice_words_reset_description, name)
+                TextButton(
+                    onClick = {
+                        texts[field] = ""
+                        onSave(language, texts.toMap())
+                    },
+                    enabled = save != WordsSave.Checking,
+                    modifier = Modifier
+                        .semantics { contentDescription = resetDescription }
+                        .testTag("words_reset_${field.name.lowercase()}"),
+                ) { Text(stringResource(R.string.voice_words_reset)) }
+            }
+        }
+        Button(
+            onClick = { onSave(language, texts.toMap()) },
+            enabled = save != WordsSave.Checking,
+            modifier = Modifier.testTag("words_save"),
+        ) { Text(stringResource(R.string.voice_words_save)) }
+        val message = when (save) {
+            WordsSave.Idle -> null
+            WordsSave.Checking -> stringResource(R.string.voice_words_checking)
+            WordsSave.Saved -> stringResource(R.string.voice_words_saved)
+            is WordsSave.Failed -> when (val problem = save.problem) {
+                is WordProblem.Unknown -> stringResource(R.string.voice_words_unknown, problem.word)
+                is WordProblem.Duplicate -> stringResource(R.string.voice_words_duplicate, problem.word)
+                is WordProblem.UndoWord -> stringResource(R.string.voice_words_undo, problem.word)
+                is WordProblem.NotOneWord -> stringResource(R.string.voice_words_not_one_word, problem.entry)
+                WordProblem.ModelUnavailable -> stringResource(R.string.voice_words_model_unavailable)
+            }
+        }
+        if (message != null) {
+            Text(
+                message,
+                color = if (save is WordsSave.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("words_message"),
+            )
+        }
+        Text(stringResource(R.string.voice_words_hint, CommandWords.undoWord(language)), style = MaterialTheme.typography.bodySmall)
     }
 }

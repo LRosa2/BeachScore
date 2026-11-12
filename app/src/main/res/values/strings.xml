@@ -126,4 +126,25 @@
     <string name="col_sets">Sets</string>
     <string name="col_points">Points</string>
     <string name="col_diff">+/−</string>
+    <string name="voice_words">Voice words – %1$s</string>
+    <string name="voice_words_blue">Blue team</string>
+    <string name="voice_words_red">Red team</string>
+    <string name="voice_words_point">Point</string>
+    <string name="voice_words_default">Default: %1$s</string>
+    <string name="voice_words_reset">Reset</string>
+    <string name="voice_words_reset_description">Reset %1$s to default</string>
+    <string name="voice_words_save">Save words</string>
+    <string name="voice_words_hint">Several words separated by commas. Short, common words cause more false points. Undo stays “%1$s”.</string>
+    <string name="voice_words_checking">Checking the words…</string>
+    <string name="voice_words_saved">Saved.</string>
+    <string name="voice_words_unknown">The speech model does not know “%1$s”. Nothing was saved.</string>
+    <string name="voice_words_duplicate">“%1$s” is used in two fields. Nothing was saved.</string>
+    <string name="voice_words_undo">“%1$s” is the undo word and cannot be used. Nothing was saved.</string>
+    <string name="voice_words_not_one_word">“%1$s” is not a single word. Nothing was saved.</string>
+    <string name="voice_words_model_unavailable">The speech model could not be loaded. Nothing was saved.</string>
+    <string name="menu">Menu</string>
+    <string name="about">About</string>
+    <string name="about_author" translatable="false">Luis Rosa</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_released">Released %1$s</string>
 </resources>
