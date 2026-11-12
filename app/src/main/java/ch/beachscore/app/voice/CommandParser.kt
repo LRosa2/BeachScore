@@ -26,13 +26,6 @@ object CommandParser {
     /** See the class comment. With 4, chatter gave a command in 4 of 144 streams (3.1.0: 20). */
     const val MAX_WORDS_BEFORE_POINT = 4
 
-    private class Words(val point: String, val blue: String, val red: String, val undo: String)
-
-    private val WORDS = mapOf(
-        Language.EN to Words("point", "blue", "red", "undo"),
-        Language.DE to Words("punkt", "blau", "rot", "zurück"),
-    )
-
     /** A command found in a token list: tokens [first]..[last]. */
     data class Match(val command: ScoreCommand, val first: Int, val last: Int)
 
@@ -65,41 +58,57 @@ object CommandParser {
             six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen
             eighteen nineteen twenty ball net set game serve team side line sand wind sun water car
             break time score lead leads
-            points pointed pint paint joint appoint glue blues blow bluff bed head said rid road under
+            pointed pint paint joint appoint glue blues blow bluff bed head said rid road under
             window undone new do
         """,
     ).mapValues { (_, words) -> words.trim().split(Regex("\\s+")) }
 
-    /** The closed grammar for the recogniser: both word orders, undo, the decoys and `[unk]`. */
-    fun grammar(language: Language): List<String> {
-        val w = WORDS.getValue(language)
-        val commands = listOf("${w.point} ${w.blue}", "${w.blue} ${w.point}", "${w.point} ${w.red}", "${w.red} ${w.point}", w.undo)
-        return commands + DECOYS.getValue(language) + UNKNOWN_WORD
+    /**
+     * The closed grammar for the recogniser: every point word with every team word in both
+     * orders, undo, the decoys and `[unk]`. Default words a user field replaced become decoys
+     * (heard as themselves rather than bent into the new words); the active words never are.
+     */
+    fun grammar(words: CommandWords): List<String> {
+        val commands = buildList {
+            for (p in words.point) for (t in words.blue + words.red) {
+                add("$p $t")
+                add("$t $p")
+            }
+            add(words.undo)
+        }
+        val active = words.all.toSet()
+        val decoys = (DECOYS.getValue(words.language) + words.replaced).distinct().filter { it !in active }
+        return commands + decoys + UNKNOWN_WORD
     }
 
-    /** The decoy words of [language] (for tests). */
+    fun grammar(language: Language): List<String> = grammar(CommandWords.defaults(language))
+
+    /** The decoy words of [language] with the default words (for tests). */
     fun decoys(language: Language): List<String> = DECOYS.getValue(language)
 
-    fun grammarJson(language: Language): String =
-        grammar(language).joinToString(",", "[", "]") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }
+    fun grammarJson(words: CommandWords): String =
+        grammar(words).joinToString(",", "[", "]") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }
+
+    fun grammarJson(language: Language): String = grammarJson(CommandWords.defaults(language))
+
+    fun find(tokens: List<String>, language: Language): List<Match> = find(tokens, CommandWords.defaults(language))
 
     /** Every command in [tokens] (lower case), in order; overlapping pairs are all reported. */
-    fun find(tokens: List<String>, language: Language): List<Match> {
-        val w = WORDS.getValue(language)
+    fun find(tokens: List<String>, words: CommandWords): List<Match> {
         fun team(t: String) = when (t) {
-            w.blue -> Team.BLUE
-            w.red -> Team.RED
+            in words.blue -> Team.BLUE
+            in words.red -> Team.RED
             else -> null
         }
         val out = mutableListOf<Match>()
         for (i in tokens.indices) {
-            if (tokens[i] == w.undo) out += Match(ScoreCommand.Undo, i, i)
+            if (tokens[i] == words.undo) out += Match(ScoreCommand.Undo, i, i)
             if (i + 1 < tokens.size) {
                 val a = tokens[i]
                 val b = tokens[i + 1]
                 val t = when {
-                    a == w.point -> team(b)
-                    b == w.point -> team(a)
+                    a in words.point -> team(b)
+                    b in words.point -> team(a)
                     else -> null
                 }
                 if (t != null) out += Match(ScoreCommand.TeamPoint(t), i, i + 1)
@@ -109,14 +118,17 @@ object CommandParser {
     }
 
     /** Returns null for an empty result (silence), which is not worth showing. */
-    fun parse(result: VoskResult, language: Language, minConfidence: Double): Heard? {
+    fun parse(result: VoskResult, language: Language, minConfidence: Double): Heard? =
+        parse(result, CommandWords.defaults(language), minConfidence)
+
+    fun parse(result: VoskResult, words: CommandWords, minConfidence: Double): Heard? {
         val text = result.text.trim().replace(Regex("\\s+"), " ")
         if (text.isEmpty()) return null
         val tokens = text.lowercase().split(' ')
         val confidences = if (result.words.size == tokens.size) result.words.map { it.confidence } else null
         val allMin = result.words.minOfOrNull { it.confidence }
 
-        val matches = find(tokens, language)
+        val matches = find(tokens, words)
         val commands = matches.map { it.command }.distinct()
         if (commands.isEmpty()) return Heard(text, allMin, Verdict.Rejected(RejectReason.UNKNOWN))
         if (commands.size > 1) return Heard(text, allMin, Verdict.Rejected(RejectReason.MULTIPLE))

@@ -11,16 +11,19 @@ import org.vosk.Recognizer
  */
 class CommandRecognizer(
     model: Model,
-    private val language: Language,
+    private val words: CommandWords,
     private val minConfidence: Double,
     sampleRate: Float = SAMPLE_RATE.toFloat(),
 ) : AutoCloseable {
 
-    private val recognizer = Recognizer(model, sampleRate, CommandParser.grammarJson(language)).apply {
+    constructor(model: Model, language: Language, minConfidence: Double, sampleRate: Float = SAMPLE_RATE.toFloat()) :
+        this(model, CommandWords.defaults(language), minConfidence, sampleRate)
+
+    private val recognizer = Recognizer(model, sampleRate, CommandParser.grammarJson(words)).apply {
         setWords(true)
     }
 
-    private val early = EarlyFinalizer(language)
+    private val early = EarlyFinalizer(words)
     private var fed = 0L
 
     /**
@@ -56,7 +59,7 @@ class CommandRecognizer(
     private fun parse(json: String): Heard? {
         lastJson = json
         val result = VoskResult.parse(json) ?: return null
-        return CommandParser.parse(result, language, minConfidence)
+        return CommandParser.parse(result, words, minConfidence)
     }
 
     override fun close() = recognizer.close()

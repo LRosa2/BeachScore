@@ -13,7 +13,9 @@ import ch.beachscore.app.score.Language
  * ("zurück zum Auto"), and the words after it make it an undo inside speech, which
  * [CommandParser] rejects.
  */
-class EarlyFinalizer(private val language: Language, private val sampleRate: Int = CommandRecognizer.SAMPLE_RATE) {
+class EarlyFinalizer(private val words: CommandWords, private val sampleRate: Int = CommandRecognizer.SAMPLE_RATE) {
+
+    constructor(language: Language) : this(CommandWords.defaults(language))
 
     private var last: String? = null
     private var since = 0L
@@ -25,7 +27,7 @@ class EarlyFinalizer(private val language: Language, private val sampleRate: Int
             since = samples
         }
         val tokens = partial.lowercase().split(' ').filter { it.isNotEmpty() }
-        val matches = CommandParser.find(tokens, language)
+        val matches = CommandParser.find(tokens, words)
         if (matches.isEmpty()) return false
         // Something follows the command, or two different ones: waiting cannot change the outcome.
         if (matches.maxOf { it.last } < tokens.size - 1 || matches.map { it.command }.distinct().size > 1) return true

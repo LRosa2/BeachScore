@@ -4,7 +4,9 @@ import ch.beachscore.app.input.ScoreCommand
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.Team
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CommandParserTest {
@@ -213,8 +215,8 @@ class CommandParserTest {
     @Test
     fun `decoys are ordinary words, never command words or their homophones`() {
         val commandWords = mapOf(
-            Language.EN to setOf("point", "blue", "red", "undo", "blew", "read"),
-            Language.DE to setOf("punkt", "blau", "rot", "zurück"),
+            Language.EN to setOf("point", "points", "blue", "red", "undo", "blew", "read"),
+            Language.DE to setOf("punkt", "punk", "blau", "rot", "zurück"),
         )
         for (language in Language.entries) {
             val decoys = CommandParser.decoys(language)
@@ -241,12 +243,76 @@ class CommandParserTest {
 
     @Test
     fun `grammar lists the phrases of one language plus unknown`() {
-        assertEquals(listOf("point blue", "blue point", "point red", "red point", "undo"), CommandParser.grammar(Language.EN).take(5))
-        assertEquals(listOf("punkt blau", "blau punkt", "punkt rot", "rot punkt", "zurück"), CommandParser.grammar(Language.DE).take(5))
+        assertEquals(
+            listOf("point blue", "blue point", "point red", "red point", "points blue", "blue points", "points red", "red points", "undo"),
+            CommandParser.grammar(Language.EN).take(9),
+        )
+        assertEquals(
+            listOf("punkt blau", "blau punkt", "punkt rot", "rot punkt", "punk blau", "blau punk", "punk rot", "rot punk", "zurück"),
+            CommandParser.grammar(Language.DE).take(9),
+        )
         for (language in Language.entries) {
             assertEquals("[unk]", CommandParser.grammar(language).last())
-            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(5).dropLast(1))
+            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(9).dropLast(1))
         }
-        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","zurück","der",""")) 
+        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","punk blau","""))
+    }
+
+    @Test
+    fun `the new default point variants score`() {
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("punk" to 1.0, "blau" to 1.0), Language.DE)))
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json("rot" to 1.0, "punk" to 1.0), Language.DE)))
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json("points" to 1.0, "red" to 1.0))))
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("blue" to 1.0, "points" to 1.0))))
+    }
+
+    private val custom = CommandWords.of(Language.DE, CustomWords(blue = listOf("himmel", "azur"), red = listOf("feuer"), point = listOf("tor")))
+
+    private fun parseCustom(vararg words: Pair<String, Double>) =
+        CommandParser.parse(VoskResult.parse(json(*words))!!, custom, VoiceSensitivity.NORMAL.minConfidence)
+
+    @Test
+    fun `custom words score in both orders, every alternative`() {
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parseCustom("tor" to 1.0, "himmel" to 1.0)))
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parseCustom("azur" to 1.0, "tor" to 1.0)))
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parseCustom("feuer" to 1.0, "tor" to 0.9)))
+        assertEquals(ScoreCommand.Undo, command(parseCustom("zurück" to 1.0)))
+    }
+
+    @Test
+    fun `replaced default words no longer score`() {
+        assertEquals(RejectReason.UNKNOWN, reason(parseCustom("punkt" to 1.0, "blau" to 1.0)))
+        assertEquals(RejectReason.UNKNOWN, reason(parseCustom("rot" to 1.0, "punkt" to 1.0)))
+        assertEquals(RejectReason.UNKNOWN, reason(parseCustom("tor" to 1.0, "rot" to 1.0)))
+    }
+
+    @Test
+    fun `spotting and the inside-speech rules work with custom words`() {
+        val heard = parseCustom("[unk]" to 1.0, "tor" to 1.0, "feuer" to 1.0, "[unk]" to 1.0)
+        assertEquals(ScoreCommand.TeamPoint(Team.RED), command(heard))
+        assertEquals("… tor feuer …", heard!!.display)
+        assertEquals(RejectReason.MULTIPLE, reason(parseCustom("tor" to 1.0, "himmel" to 1.0, "tor" to 1.0, "feuer" to 1.0)))
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parseCustom("tor" to 1.0, "himmel" to 1.0, "himmel" to 1.0, "tor" to 1.0)))
+        assertEquals(
+            RejectReason.IN_SPEECH,
+            reason(parseCustom("der" to 1.0, "ball" to 1.0, "war" to 1.0, "im" to 1.0, "netz" to 1.0, "tor" to 1.0, "himmel" to 1.0)),
+        )
+        assertEquals(RejectReason.LOW_CONFIDENCE, reason(parseCustom("tor" to 0.5, "himmel" to 1.0)))
+        assertEquals(RejectReason.UNKNOWN, reason(parseCustom("tor" to 1.0, "[unk]" to 1.0, "himmel" to 1.0)))
+    }
+
+    @Test
+    fun `grammar of a custom set - with its phrases and the replaced defaults as decoys`() {
+        val grammar = CommandParser.grammar(custom)
+        assertEquals(listOf("tor himmel", "himmel tor", "tor azur", "azur tor", "tor feuer", "feuer tor", "zurück"), grammar.take(7))
+        val decoys = grammar.drop(7).dropLast(1)
+        assertTrue("punkt" in decoys && "punk" in decoys && "blau" in decoys && "rot" in decoys)
+        assertFalse("tor" in decoys || "himmel" in decoys || "feuer" in decoys)
+        // "netz" is a default decoy; as a command word it leaves the decoys.
+        val net = CommandParser.grammar(CommandWords.of(Language.DE, CustomWords(blue = listOf("netz"))))
+        assertFalse("netz" in net)
+        assertTrue("netz punkt" in net)
+        assertEquals(decoys.size, decoys.toSet().size)
+        assertEquals("[unk]", grammar.last())
     }
 }

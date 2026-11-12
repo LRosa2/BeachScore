@@ -70,6 +70,15 @@ class EarlyFinalizerTest {
     }
 
     @Test
+    fun `custom words are watched instead of the defaults`() {
+        val words = CommandWords.of(Language.DE, CustomWords(point = listOf("tor")))
+        val f = EarlyFinalizer(words)
+        assertEquals(null, firstFinalise(f, "punkt blau", "punkt blau", "punkt blau", "punkt blau", "punkt blau"))
+        f.reset()
+        assertEquals(200, firstFinalise(f, "blau tor", "blau tor [unk]"))
+    }
+
+    @Test
     fun `the partial result json is read`() {
         assertEquals("punkt blau", VoskResult.parsePartial("{\n  \"partial\" : \"punkt blau\"\n}"))
         assertEquals("", VoskResult.parsePartial("""{"partial" : ""}"""))
