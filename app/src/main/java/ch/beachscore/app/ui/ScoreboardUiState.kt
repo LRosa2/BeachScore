@@ -8,6 +8,7 @@ import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.voice.Heard
 import ch.beachscore.app.voice.InputDevice
 import ch.beachscore.app.voice.VoiceStatus
+import ch.beachscore.app.voice.WordProblem
 
 data class TeamUi(val team: Team, val points: Int, val sets: Int, val players: List<Player> = emptyList())
 
@@ -15,6 +16,15 @@ data class SetWonUi(val winner: Team, val winnerPoints: Int, val loserPoints: In
 
 /** The most recent accepted point; [seq] changes on every point so the UI can re-run its flash. */
 data class PointFlash(val team: Team, val seq: Int)
+
+/** Result of the last "Save" of the voice words. */
+sealed interface WordsSave {
+    data object Idle : WordsSave
+    /** Loading the speech model to check the words. */
+    data object Checking : WordsSave
+    data object Saved : WordsSave
+    data class Failed(val problem: WordProblem) : WordsSave
+}
 
 data class ScoreboardUiState(
     val loaded: Boolean = false,
@@ -33,6 +43,7 @@ data class ScoreboardUiState(
     val voice: VoiceUi = VoiceUi(),
     /** Voice commands could not be (or stay) on because the microphone permission is missing. */
     val voicePermissionDenied: Boolean = false,
+    val wordsSave: WordsSave = WordsSave.Idle,
 )
 
 /**

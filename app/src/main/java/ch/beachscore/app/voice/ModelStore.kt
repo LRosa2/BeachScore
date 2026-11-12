@@ -18,6 +18,7 @@ class ModelStore(context: Context) {
 
     /** Returns the model directory, copying it first if needed. Blocking; call off the main thread. */
     @Throws(IOException::class)
+    @Synchronized
     fun ensure(language: Language, onProgress: (Float) -> Unit = {}): File {
         val base = "vosk/${language.tag}"
         val manifest = assets.open("$base/manifest.txt").bufferedReader().use { it.readLines() }

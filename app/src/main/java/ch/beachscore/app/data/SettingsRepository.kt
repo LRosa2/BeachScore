@@ -9,7 +9,10 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ch.beachscore.app.score.Language
+import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.MicChoice
+import ch.beachscore.app.voice.VoiceWords
+import ch.beachscore.app.voice.WordField
 import ch.beachscore.app.voice.VoiceSensitivity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -40,6 +43,10 @@ class SettingsRepository(
             prefs[VOICE_SENSITIVITY] = new.voiceSensitivity.name
             prefs[SHOW_HEARD] = new.showHeard
             prefs[MICROPHONE] = new.microphone?.encode() ?: ""
+            for (language in Language.entries) {
+                val words = new.voiceWords[language] ?: CustomWords()
+                for (field in WordField.entries) prefs[wordsKey(language, field)] = VoiceWords.encode(words[field])
+            }
         }
     }
 
@@ -56,6 +63,9 @@ class SettingsRepository(
                 ?: defaults.voiceSensitivity,
             showHeard = this[SHOW_HEARD] ?: defaults.showHeard,
             microphone = MicChoice.decode(this[MICROPHONE]),
+            voiceWords = Language.entries.associateWith { language ->
+                WordField.entries.fold(CustomWords()) { words, field -> words.with(field, VoiceWords.decode(this[wordsKey(language, field)])) }
+            }.filterValues { !it.isEmpty },
         ).sanitized()
     }
 
@@ -69,5 +79,9 @@ class SettingsRepository(
         val VOICE_SENSITIVITY = stringPreferencesKey("voice_sensitivity")
         val SHOW_HEARD = booleanPreferencesKey("show_heard")
         val MICROPHONE = stringPreferencesKey("microphone")
+
+        /** "voice_words_de_blue", ...: comma separated, empty for the defaults. */
+        fun wordsKey(language: Language, field: WordField) =
+            stringPreferencesKey("voice_words_${language.tag}_${field.name.lowercase()}")
     }
 }

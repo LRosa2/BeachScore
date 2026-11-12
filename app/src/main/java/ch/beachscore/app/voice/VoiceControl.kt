@@ -34,6 +34,17 @@ interface VoiceControl {
      * Starts (or reconfigures) listening; idempotent for the same arguments. A new
      * [microphone] (null: automatic) is applied without reloading the model.
      */
-    fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice? = null)
+    fun start(
+        language: Language,
+        sensitivity: VoiceSensitivity,
+        microphone: MicChoice? = null,
+        words: CommandWords = CommandWords.defaults(language),
+    )
     fun stop()
+
+    /**
+     * The [words] the speech model of [language] does not know, in order; null when the model
+     * cannot be loaded. Loads the model (about a second); call from a coroutine.
+     */
+    suspend fun unknownWords(language: Language, words: List<String>): List<String>?
 }

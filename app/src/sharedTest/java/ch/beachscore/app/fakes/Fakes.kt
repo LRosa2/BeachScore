@@ -19,6 +19,7 @@ import ch.beachscore.app.voice.Heard
 import ch.beachscore.app.voice.InputDevice
 import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.Verdict
+import ch.beachscore.app.voice.CommandWords
 import ch.beachscore.app.voice.VoiceControl
 import ch.beachscore.app.voice.VoiceSensitivity
 import ch.beachscore.app.voice.VoiceStatus
@@ -85,12 +86,29 @@ class FakeVoice : VoiceControl {
     var microphone: MicChoice? = null
         private set
 
-    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?) {
-        if (listening == language to sensitivity && this.microphone == microphone) return
-        if (listening != language to sensitivity) startCount++
+    /** Words of the last start() (kept after stop()). */
+    var words: CommandWords? = null
+        private set
+
+    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords) {
+        if (listening == language to sensitivity && this.microphone == microphone && this.words == words) return
+        if (listening != language to sensitivity || this.words != words) startCount++
         listening = language to sensitivity
         this.microphone = microphone
+        this.words = words
         status.value = VoiceStatus.Listening
+    }
+
+    /** Words the "model" knows; null: the model cannot be loaded. */
+    var vocabulary: Set<String>? = emptySet()
+
+    /** Every word list passed to [unknownWords]. */
+    val checked = mutableListOf<List<String>>()
+
+    override suspend fun unknownWords(language: Language, words: List<String>): List<String>? {
+        checked += words
+        val known = vocabulary ?: return null
+        return words.filter { it !in known }
     }
 
     override fun stop() {

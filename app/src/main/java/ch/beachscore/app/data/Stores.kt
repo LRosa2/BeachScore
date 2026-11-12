@@ -4,6 +4,8 @@ import ch.beachscore.app.history.Lineup
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
+import ch.beachscore.app.voice.CommandWords
+import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.VoiceSensitivity
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +23,12 @@ data class Settings(
     val showHeard: Boolean = true,
     /** Preferred input for voice commands; null is "Automatic" (Android's routing). */
     val microphone: MicChoice? = null,
+    /** The user's voice words per language; a missing language or empty field means the defaults. */
+    val voiceWords: Map<Language, CustomWords> = emptyMap(),
 ) {
+    /** The words the recogniser listens for in the current language. */
+    fun commandWords(): CommandWords = CommandWords.of(language, voiceWords[language] ?: CustomWords())
+
     /** Brings values read from disk back into the ranges the UI offers. */
     fun sanitized(): Settings = copy(
         pointsPerSet = pointsPerSet.takeIf { it in MatchState.ALLOWED_TARGETS } ?: MatchState.DEFAULT_TARGET,

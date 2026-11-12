@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.vosk.LibVosk
 import org.vosk.LogLevel
@@ -89,7 +90,9 @@ class VoiceInput(
     private var choice: MicChoice? = null
 
     private var job: Job? = null
-    private var config: Pair<Language, VoiceSensitivity>? = null
+    private data class Config(val language: Language, val sensitivity: VoiceSensitivity, val words: CommandWords)
+
+    private var config: Config? = null
 
     /** One loaded model at a time (the active language); kept across stop/start for a quick resume. */
     private var loaded: Pair<Language, Model>? = null
@@ -113,17 +116,18 @@ class VoiceInput(
     }
 
     @Synchronized
-    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?) {
+    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords) {
         if (choice != microphone) {
             choice = microphone
             routingChanges.value++
         }
-        if (config == language to sensitivity && job?.isActive == true) return
-        config = language to sensitivity
+        val wanted = Config(language, sensitivity, words)
+        if (config == wanted && job?.isActive == true) return
+        config = wanted
         val previous = job
         job = scope.launch(Dispatchers.Default) {
             previous?.cancelAndJoin() // the microphone must be released before it is reopened
-            listen(language, sensitivity)
+            listen(language, sensitivity, words)
         }
     }
 
@@ -136,7 +140,18 @@ class VoiceInput(
         _active.value = null
     }
 
-    private suspend fun listen(language: Language, sensitivity: VoiceSensitivity) {
+    override suspend fun unknownWords(language: Language, words: List<String>): List<String>? = withContext(Dispatchers.IO) {
+        // A model of its own: the listening one may be closed or swapped meanwhile.
+        try {
+            val dir = modelStore.ensure(language)
+            Model(dir.absolutePath).use { model -> words.filterNot { VoskVocabulary.knows(model, it) } }
+        } catch (e: Exception) {
+            Log.e(TAG, "speech model unavailable for the word check", e)
+            null
+        }
+    }
+
+    private suspend fun listen(language: Language, sensitivity: VoiceSensitivity, words: CommandWords) {
         val model = try {
             loadModel(language)
         } catch (e: Exception) {
@@ -146,7 +161,7 @@ class VoiceInput(
         }
         if (!currentCoroutineContext().isActive) return
 
-        CommandRecognizer(model, language, sensitivity.minConfidence).use { recognizer ->
+        CommandRecognizer(model, words, sensitivity.minConfidence).use { recognizer ->
             val gate = EchoGate(echoGuard)
             var failuresInARow = 0
             try {

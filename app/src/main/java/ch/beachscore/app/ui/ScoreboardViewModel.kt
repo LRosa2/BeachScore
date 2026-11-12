@@ -13,6 +13,7 @@ import ch.beachscore.app.input.Side
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.input.TouchInput
 import ch.beachscore.app.score.Announcer
+import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchEvent
 import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.score.ScoreEngine
@@ -23,6 +24,10 @@ import ch.beachscore.app.voice.Heard
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceControl
+import ch.beachscore.app.voice.VoiceWords
+import ch.beachscore.app.voice.WordField
+import ch.beachscore.app.voice.WordProblem
+import ch.beachscore.app.voice.WordsCheck
 import ch.beachscore.app.data.AddPlayerResult
 import ch.beachscore.app.data.HistoryStore
 import ch.beachscore.app.data.PlayerStore
@@ -213,6 +218,37 @@ class ScoreboardViewModel(
         updateListening()
     }
 
+    /**
+     * Settings "Save" (and "Reset", with that field empty) of the voice words of [language]:
+     * checks the field texts, then the vocabulary of the speech model, and stores them only if
+     * all is well. The outcome is [ScoreboardUiState.wordsSave].
+     */
+    fun saveVoiceWords(language: Language, fields: Map<WordField, String>) {
+        val voice = voice ?: return
+        viewModelScope.launch {
+            val words = when (val check = VoiceWords.check(language, fields)) {
+                is WordsCheck.Failed -> return@launch setWordsSave(WordsSave.Failed(check.problem))
+                is WordsCheck.Ok -> check.words
+            }
+            if (!words.isEmpty) {
+                setWordsSave(WordsSave.Checking)
+                val unknown = voice.unknownWords(language, words.all)
+                    ?: return@launch setWordsSave(WordsSave.Failed(WordProblem.ModelUnavailable))
+                if (unknown.isNotEmpty()) return@launch setWordsSave(WordsSave.Failed(WordProblem.Unknown(unknown.first())))
+            }
+            settingsStore.update { current ->
+                val others = current.voiceWords - language
+                current.copy(voiceWords = if (words.isEmpty) others else others + (language to words))
+            }
+            setWordsSave(WordsSave.Saved)
+        }
+    }
+
+    /** A voice-word field was edited: the last save message no longer applies. */
+    fun onVoiceWordsEdited() = setWordsSave(WordsSave.Idle)
+
+    private fun setWordsSave(state: WordsSave) = _uiState.update { it.copy(wordsSave = state) }
+
     /** Settings "Test voice": speaks the current score even when announcements are off. */
     fun onTestVoice() {
         val score = match?.state?.score ?: return
@@ -285,7 +321,7 @@ class ScoreboardViewModel(
             updateSettings { it.copy(voiceCommands = false) }
         }
         val want = match != null && settings.voiceCommands && foreground && scoreboardVisible && micPermission
-        if (want) voice.start(settings.language, settings.voiceSensitivity, settings.microphone) else voice.stop()
+        if (want) voice.start(settings.language, settings.voiceSensitivity, settings.microphone, settings.commandWords()) else voice.stop()
         if (!want || !settings.showHeard) {
             heardJob?.cancel()
             _uiState.update { it.copy(voice = it.voice.copy(lastHeard = null)) }

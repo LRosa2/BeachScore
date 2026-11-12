@@ -14,12 +14,16 @@ import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.score.Score
 import ch.beachscore.app.score.Team
+import ch.beachscore.app.voice.CommandWords
+import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.InputDevice
 import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.MicKind
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceSensitivity
+import ch.beachscore.app.voice.WordField
+import ch.beachscore.app.voice.WordProblem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -272,5 +276,81 @@ class ScoreboardViewModelVoiceTest {
         assertEquals(usb, vm.ui.voice.activeMicrophone)
         voice.active.value = phone
         assertEquals(phone, vm.ui.voice.activeMicrophone, "receiver unplugged: back on the phone")
+    }
+
+    // --- voice words (3.3.0) -----------------------------------------------------------------
+
+    private fun fields(blue: String = "", red: String = "", point: String = "") =
+        mapOf(WordField.BLUE to blue, WordField.RED to red, WordField.POINT to point)
+
+    @Test
+    fun `the recogniser listens for the active words of the app language`() = runTest {
+        val vm = viewModel()
+        assertEquals(CommandWords.defaults(Language.EN), voice.words)
+        val starts = voice.startCount
+        settingsStore.update { it.copy(voiceWords = mapOf(Language.EN to CustomWords(point = listOf("score")))) }
+        assertEquals(listOf("score"), voice.words!!.point)
+        assertEquals(starts + 1, voice.startCount, "new words rebuild the recogniser")
+        settingsStore.update { it.copy(language = Language.DE) }
+        assertEquals(CommandWords.defaults(Language.DE), voice.words, "German words are separate")
+        vm.onForegroundChanged(false)
+    }
+
+    @Test
+    fun `valid words are checked against the model and saved for that language only`() = runTest {
+        val vm = viewModel()
+        voice.vocabulary = setOf("himmel", "feuer", "tor")
+        vm.saveVoiceWords(Language.DE, fields(blue = "Himmel", red = "feuer ", point = "tor"))
+        assertEquals(WordsSave.Saved, vm.ui.wordsSave)
+        assertEquals(listOf(listOf("himmel", "feuer", "tor")), voice.checked)
+        val stored = settingsStore.settings.value.voiceWords
+        assertEquals(CustomWords(blue = listOf("himmel"), red = listOf("feuer"), point = listOf("tor")), stored[Language.DE])
+        assertNull(stored[Language.EN])
+    }
+
+    @Test
+    fun `a word the model does not know is rejected by name and nothing is saved`() = runTest {
+        val vm = viewModel()
+        voice.vocabulary = setOf("himmel")
+        vm.saveVoiceWords(Language.DE, fields(blue = "himmel", point = "xqzt"))
+        assertEquals(WordsSave.Failed(WordProblem.Unknown("xqzt")), vm.ui.wordsSave)
+        assertNull(settingsStore.settings.value.voiceWords[Language.DE])
+    }
+
+    @Test
+    fun `a duplicate is rejected without loading the model`() = runTest {
+        val vm = viewModel()
+        vm.saveVoiceWords(Language.EN, fields(blue = "green", red = "green"))
+        assertEquals(WordsSave.Failed(WordProblem.Duplicate("green")), vm.ui.wordsSave)
+        assertEquals(emptyList<List<String>>(), voice.checked)
+    }
+
+    @Test
+    fun `words are not saved when the model cannot be loaded`() = runTest {
+        val vm = viewModel()
+        voice.vocabulary = null
+        vm.saveVoiceWords(Language.EN, fields(point = "score"))
+        assertEquals(WordsSave.Failed(WordProblem.ModelUnavailable), vm.ui.wordsSave)
+        assertNull(settingsStore.settings.value.voiceWords[Language.EN])
+    }
+
+    @Test
+    fun `empty fields go back to the defaults without a model check`() = runTest {
+        settingsStore.update { it.copy(voiceWords = mapOf(Language.EN to CustomWords(point = listOf("score")))) }
+        val vm = viewModel()
+        vm.saveVoiceWords(Language.EN, fields())
+        assertEquals(WordsSave.Saved, vm.ui.wordsSave)
+        assertEquals(CustomWords(), settingsStore.settings.value.voiceWords[Language.EN] ?: CustomWords())
+        assertEquals(emptyList<List<String>>(), voice.checked)
+        assertEquals(CommandWords.defaults(Language.EN), voice.words)
+    }
+
+    @Test
+    fun `editing again clears the last save message`() = runTest {
+        val vm = viewModel()
+        vm.saveVoiceWords(Language.EN, fields(blue = "red"))
+        assertEquals(WordsSave.Failed(WordProblem.Duplicate("red")), vm.ui.wordsSave)
+        vm.onVoiceWordsEdited()
+        assertEquals(WordsSave.Idle, vm.ui.wordsSave)
     }
 }
