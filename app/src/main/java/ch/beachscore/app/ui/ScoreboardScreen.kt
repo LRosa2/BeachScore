@@ -69,7 +69,7 @@ import ch.beachscore.app.score.Team
 
 /** Connects the view model to the stateless screen and hosts the settings sheet. */
 @Composable
-fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, onOpenHistory: () -> Unit = {}) {
+fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, onOpen: (MenuEntry) -> Unit = {}) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var pickerTeam by rememberSaveable { mutableStateOf<Team?>(null) }
     var speechNoticeDismissed by rememberSaveable { mutableStateOf(false) }
@@ -94,8 +94,7 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, on
         onSwapSides = viewModel::onSwapSides,
         onNewMatch = viewModel::onNewMatch,
         onNextSet = viewModel::onNextSet,
-        onOpenSettings = { showSettings = true },
-        onOpenHistory = onOpenHistory,
+        onOpenMenu = { showSettings = true },
         onNames = { pickerTeam = it },
     )
     pickerTeam?.let { team ->
@@ -119,7 +118,15 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, on
             onDismissSpeechNotice = { speechNoticeDismissed = true },
             onChange = viewModel::updateSettings,
             onTestVoice = viewModel::onTestVoice,
-            onClose = { showSettings = false },
+            onClose = {
+                showSettings = false
+                viewModel.onVoiceWordsEdited()
+            },
+            onOpen = { entry ->
+                showSettings = false
+                viewModel.onVoiceWordsEdited()
+                onOpen(entry)
+            },
             wordsSave = state.wordsSave,
             onSaveWords = viewModel::saveVoiceWords,
             onWordsEdited = viewModel::onVoiceWordsEdited,
@@ -135,8 +142,7 @@ fun ScoreboardScreen(
     onSwapSides: () -> Unit,
     onNewMatch: () -> Unit,
     onNextSet: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenHistory: () -> Unit = {},
+    onOpenMenu: () -> Unit,
     onNames: (Team) -> Unit = {},
 ) {
     // Left means left on screen, whatever the locale: hardware keys and swap rely on it.
@@ -172,8 +178,7 @@ fun ScoreboardScreen(
                 onUndo = onUndo,
                 onSwapSides = onSwapSides,
                 onNewMatch = onNewMatch,
-                onOpenSettings = onOpenSettings,
-                onOpenHistory = onOpenHistory,
+                onOpenMenu = onOpenMenu,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
             state.setWon?.let { SetWonOverlay(it, onNextSet = onNextSet, onNewMatch = onNewMatch, onUndo = onUndo) }

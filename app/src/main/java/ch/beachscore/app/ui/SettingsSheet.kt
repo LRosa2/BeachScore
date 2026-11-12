@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +40,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +55,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.beachscore.app.BuildConfig
 import ch.beachscore.app.R
 import ch.beachscore.app.data.Settings
 import ch.beachscore.app.input.TapLock
@@ -65,11 +71,26 @@ import ch.beachscore.app.voice.VoiceStatus
 import ch.beachscore.app.voice.VoiceWords
 import ch.beachscore.app.voice.WordField
 import ch.beachscore.app.voice.WordProblem
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
+/** Entries of the menu list at the top of the side panel. */
+enum class MenuEntry(val label: Int, val tag: String) {
+    SETTINGS(R.string.settings, "menu_settings"),
+    HISTORY(R.string.history, "menu_history"),
+    PLAYERS(R.string.players, "menu_players"),
+    STATISTICS(R.string.statistics, "menu_statistics"),
+    ABOUT(R.string.about, "menu_about"),
+}
+
 /**
- * Settings as a side panel (landscape): points per set · announce · language · tap lock ·
- * hardware buttons · test voice. Drawn in-window (not a dialog) so immersive mode stays on.
+ * The menu as a side panel (landscape). At the top a short list: Settings · History · Players ·
+ * Statistics · About. Settings (selected when the panel opens) and About show below the list;
+ * the others open their screens through [onOpen]. Settings: points per set · announce ·
+ * language · tap lock · hardware buttons · voice · test voice. Drawn in-window (not a dialog)
+ * so immersive mode stays on.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +108,9 @@ fun SettingsSheet(
     wordsSave: WordsSave = WordsSave.Idle,
     onSaveWords: (Language, Map<WordField, String>) -> Unit = { _, _ -> },
     onWordsEdited: () -> Unit = {},
+    onOpen: (MenuEntry) -> Unit = {},
 ) {
+    var section by rememberSaveable { mutableStateOf(MenuEntry.SETTINGS) }
     Box(
         Modifier
             .fillMaxSize()
@@ -110,9 +133,21 @@ fun SettingsSheet(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.settings), fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.menu), fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     TextButton(onClick = onClose, modifier = Modifier.testTag("settings_close")) { Text(stringResource(R.string.close)) }
                 }
+                MenuList(section) { entry ->
+                    when (entry) {
+                        MenuEntry.SETTINGS, MenuEntry.ABOUT -> section = entry
+                        else -> onOpen(entry)
+                    }
+                }
+                HorizontalDivider()
+                if (section == MenuEntry.ABOUT) {
+                    About(settings.language)
+                    return@Column
+                }
+                Text(stringResource(R.string.settings), fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
                 if (speech == SpeechAvailability.UNAVAILABLE && !speechNoticeDismissed) {
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
@@ -380,5 +415,50 @@ private fun VoiceWordsEditor(
             )
         }
         Text(stringResource(R.string.voice_words_hint, CommandWords.undoWord(language)), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** The short list at the top of the menu; [selected] is highlighted. Rows are 48 dp high. */
+@Composable
+private fun MenuList(selected: MenuEntry, onClick: (MenuEntry) -> Unit) {
+    Column(Modifier.selectableGroup()) {
+        MenuEntry.entries.forEach { entry ->
+            val isSelected = entry == selected
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                        RoundedCornerShape(8.dp),
+                    )
+                    .selectable(selected = isSelected, role = Role.Tab) { onClick(entry) }
+                    .padding(horizontal = 12.dp)
+                    .testTag(entry.tag),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(entry.label),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+/** About: app name, author, version and release date, both from the build. */
+@Composable
+private fun About(language: Language) {
+    val date = runCatching {
+        LocalDate.parse(BuildConfig.RELEASE_DATE)
+            .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.forLanguageTag(language.tag)))
+    }.getOrDefault(BuildConfig.RELEASE_DATE)
+    val color = MaterialTheme.colorScheme.onSurface
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("about")) {
+        Text(stringResource(R.string.app_name), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(stringResource(R.string.about_author), style = MaterialTheme.typography.titleMedium, color = color)
+        Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge, color = color)
+        Text(stringResource(R.string.about_released, date), style = MaterialTheme.typography.bodyLarge, color = color)
     }
 }

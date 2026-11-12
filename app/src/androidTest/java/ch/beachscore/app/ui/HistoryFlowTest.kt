@@ -98,7 +98,8 @@ class HistoryFlowTest {
         assertEquals(15 to 9, history.records.value.single().sets.single().let { it.bluePoints to it.redPoints })
         rule.onNodeWithTag("points_LEFT").assertTextEquals("0")
 
-        rule.onNodeWithTag("history").performClick()
+        rule.onNodeWithTag("menu").performClick()
+        rule.onNodeWithTag("menu_history").performClick()
         rule.onNodeWithTag("history_list").assertIsDisplayed()
         rule.onNodeWithText("15:9").assertIsDisplayed()
     }
@@ -120,7 +121,8 @@ class HistoryFlowTest {
     fun multiSelectAssignsPlayersToSeveralMatchesAtOnce() {
         seed(3)
         show()
-        rule.onNodeWithTag("history").performClick()
+        rule.onNodeWithTag("menu").performClick()
+        rule.onNodeWithTag("menu_history").performClick()
         rule.onNodeWithTag("match_1").performTouchInput { longClick() }
         rule.onNodeWithTag("match_2").performClick()
         rule.onNodeWithTag("assign_players").performClick()
@@ -139,7 +141,8 @@ class HistoryFlowTest {
     fun multiSelectDeleteAsksFirst() {
         seed(2)
         show()
-        rule.onNodeWithTag("history").performClick()
+        rule.onNodeWithTag("menu").performClick()
+        rule.onNodeWithTag("menu_history").performClick()
         rule.onNodeWithTag("match_2").performTouchInput { longClick() }
         rule.onNodeWithTag("delete_selected").performClick()
         rule.onNodeWithTag("confirm_delete").performClick()
@@ -154,8 +157,8 @@ class HistoryFlowTest {
             history.add(MatchRecord(startedAt = System.currentTimeMillis(), endedAt = System.currentTimeMillis(), lineup = Lineup(), sets = listOf(FinishedSet(1, 15, 3, 15, null, null, ""))))
         }
         show()
-        rule.onNodeWithTag("history").performClick()
-        rule.onNodeWithTag("open_statistics").performClick()
+        rule.onNodeWithTag("menu").performClick()
+        rule.onNodeWithTag("menu_statistics").performClick()
         rule.onNodeWithTag("stats_table").assertIsDisplayed()
         rule.onNodeWithText("100 %").assertIsDisplayed()
         rule.onNodeWithTag("excluded_note").assertIsDisplayed()
@@ -164,8 +167,8 @@ class HistoryFlowTest {
     @Test
     fun playersCanBeAddedAndRemoved() {
         show()
-        rule.onNodeWithTag("history").performClick()
-        rule.onNodeWithTag("open_players").performClick()
+        rule.onNodeWithTag("menu").performClick()
+        rule.onNodeWithTag("menu_players").performClick()
         rule.onNodeWithTag("add_player_name").performTextInput("Eva")
         rule.onNodeWithTag("add_player").performClick()
         rule.waitUntil(5_000) { players.all.value.any { it.name == "Eva" } }

@@ -24,8 +24,9 @@ import ch.beachscore.app.ui.records.StatisticsScreen
 enum class Screen { SCOREBOARD, HISTORY, MATCH, PLAYERS, STATISTICS }
 
 /**
- * Screen switching without a navigation library. The scoreboard is the home; system Back
- * goes up one level (match/players/statistics → history → scoreboard).
+ * Screen switching without a navigation library. The scoreboard is the home; history, players
+ * and statistics are opened from its menu. System Back goes up one level (match → history,
+ * everything else → scoreboard).
  */
 @Composable
 fun BeachScoreRoot(
@@ -41,7 +42,7 @@ fun BeachScoreRoot(
 
     val up = {
         screen = when (screen) {
-            Screen.MATCH, Screen.PLAYERS, Screen.STATISTICS -> Screen.HISTORY
+            Screen.MATCH -> Screen.HISTORY
             else -> Screen.SCOREBOARD
         }
     }
@@ -50,7 +51,14 @@ fun BeachScoreRoot(
     }
 
     if (screen == Screen.SCOREBOARD) {
-        ScoreboardRoute(scoreboard, scoreboardState, onOpenHistory = { screen = Screen.HISTORY })
+        ScoreboardRoute(scoreboard, scoreboardState, onOpen = { entry ->
+            when (entry) {
+                MenuEntry.HISTORY -> screen = Screen.HISTORY
+                MenuEntry.PLAYERS -> screen = Screen.PLAYERS
+                MenuEntry.STATISTICS -> screen = Screen.STATISTICS
+                MenuEntry.SETTINGS, MenuEntry.ABOUT -> Unit
+            }
+        })
         return
     }
     val state by records.state.collectAsStateWithLifecycle()
@@ -61,8 +69,6 @@ fun BeachScoreRoot(
             state, records,
             onBack = up,
             onOpenMatch = { matchId = it; screen = Screen.MATCH },
-            onOpenStatistics = { screen = Screen.STATISTICS },
-            onOpenPlayers = { screen = Screen.PLAYERS },
             onExport = { ids -> CsvShare.share(context, records.csv(ids)) },
         )
         Screen.MATCH -> MatchDetailScreen(state, records, matchId, onBack = up)

@@ -54,8 +54,6 @@ fun HistoryScreen(
     vm: RecordsViewModel,
     onBack: () -> Unit,
     onOpenMatch: (Long) -> Unit,
-    onOpenStatistics: () -> Unit,
-    onOpenPlayers: () -> Unit,
     onExport: (ids: Set<Long>?) -> Unit,
 ) {
     val selection = state.options.selection
@@ -72,8 +70,6 @@ fun HistoryScreen(
             }
         } else {
             RecordsTopBar(stringResource(R.string.history), onBack = onBack) {
-                TextButton(onClick = onOpenStatistics, modifier = Modifier.testTag("open_statistics")) { Text(stringResource(R.string.statistics)) }
-                TextButton(onClick = onOpenPlayers, modifier = Modifier.testTag("open_players")) { Text(stringResource(R.string.players)) }
                 TextButton(onClick = { onExport(null) }, enabled = state.matches.isNotEmpty()) { Text(stringResource(R.string.export_csv)) }
             }
         }

@@ -63,7 +63,7 @@ class MicrophoneSettingsTest {
         }
         rule.onNodeWithTag("mic_in_use", useUnmergedTree = true).assertTextEquals("Phone")
 
-        rule.onNodeWithTag("settings").performClick()
+        rule.onNodeWithTag("menu").performClick()
         rule.onNodeWithTag("mic_auto").performScrollTo().assertIsSelected()
         rule.onNodeWithTag("microphone_in_use", useUnmergedTree = true).assertTextEquals("In use: Phone · moto g15 power")
         rule.onNodeWithTag("mic_USB_Wireless Mic Rx").performScrollTo().performClick()
@@ -84,7 +84,7 @@ class MicrophoneSettingsTest {
             voice.microphones.value = listOf(phone)
             voice.active.value = phone
         }
-        rule.onNodeWithTag("settings").performClick()
+        rule.onNodeWithTag("menu").performClick()
         rule.onNodeWithText("USB · Wireless Mic Rx (not connected)").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("mic_USB_Wireless Mic Rx").assertIsSelected()
         rule.onNodeWithTag("microphone_in_use", useUnmergedTree = true).assertTextEquals("In use: Phone · moto g15 power")

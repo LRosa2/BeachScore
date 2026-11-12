@@ -1,5 +1,6 @@
 import java.net.URI
 import java.security.MessageDigest
+import java.time.LocalDate
 import java.util.zip.ZipInputStream
 
 plugins {
@@ -21,6 +22,8 @@ android {
         targetSdk = 36
         versionCode = 5
         versionName = "3.2.0"
+        // Shown in About: the build date (ISO), formatted by the app for its language.
+        buildConfigField("String", "RELEASE_DATE", "\"${LocalDate.now()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -43,6 +46,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
