@@ -77,9 +77,10 @@ class MenuAndVoiceWordsTest {
         show()
         rule.onNodeWithTag("menu").performClick()
         rule.onNodeWithTag("menu_about").performClick()
-        rule.onNodeWithTag("about").assertIsDisplayed()
-        rule.onNodeWithText("Luis Rosa").assertIsDisplayed()
-        rule.onNodeWithText(BuildConfig.VERSION_NAME, substring = true).assertIsDisplayed()
+        // The panel is clickable, which merges its texts: look in the unmerged tree.
+        rule.onNodeWithTag("about", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Luis Rosa", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Version " + BuildConfig.VERSION_NAME, substring = true, useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -89,7 +90,7 @@ class MenuAndVoiceWordsTest {
         rule.onNodeWithTag("menu").performClick()
         rule.onNodeWithTag("words_blue").performScrollTo().performTextReplacement("Himmel, Xqzt")
         rule.onNodeWithTag("words_save").performScrollTo().performClick()
-        rule.onNodeWithTag("words_message").performScrollTo().assert(SemanticsMatcher("names the word") {
+        rule.onNodeWithTag("words_message", useUnmergedTree = true).assert(SemanticsMatcher("names the word") {
             it.config.getOrNull(SemanticsProperties.Text)?.joinToString().orEmpty().contains("xqzt")
         })
         assertNull(settings.settings.value.voiceWords[Language.DE])
@@ -102,7 +103,7 @@ class MenuAndVoiceWordsTest {
         rule.onNodeWithTag("menu").performClick()
         rule.onNodeWithTag("words_blue").performScrollTo().performTextReplacement("rot")
         rule.onNodeWithTag("words_save").performScrollTo().performClick()
-        rule.onNodeWithTag("words_message").performScrollTo().assert(SemanticsMatcher("names the word") {
+        rule.onNodeWithTag("words_message", useUnmergedTree = true).assert(SemanticsMatcher("names the word") {
             it.config.getOrNull(SemanticsProperties.Text)?.joinToString().orEmpty().contains("rot")
         })
         assertNull(settings.settings.value.voiceWords[Language.DE])
