@@ -187,6 +187,9 @@ the range test; there is no separate throwaway spike.
   | Point Red     | "Punkt Rot" / "Rot Punkt"     | "point red" / "red point"     |
   | Undo          | "zurück"                      | "undo"                        |
 
+  Since 3.3.0 the team and point words are configurable and "Punk"/"points" are also
+  default point words; see "3.3.0" at the end.
+
 - Voice names the **team** (colour), not the side, so it is unaffected by Swap sides.
   This needs a team-addressed scoring command next to the existing side-addressed one.
 - Voice points go through the same TapLock as taps and keys. "Undo" is not locked.
@@ -439,16 +442,24 @@ set scores after the fact, voice control of any of this.
   | Red   | rot              | red               |
   | Point | punkt, punk      | point, points     |
 
-  "punk" and "points" are new defaults (Vosk often hears a short "Punkt"/"point" as
-  these); they are no longer decoys.
+  "punk" and "points" are new defaults; "points" is no longer a decoy (as a decoy it
+  swallowed "points blue"). Both are *alike variants*: they count when heard but get no
+  grammar entry of their own. The closed grammar hears them as "punkt"/"point"; as
+  separate entries they split the confidence of a clear "point" (0.50-0.64 instead of
+  1.00) and the regular commands fell from 142 to 132 of 184 (see below). Words a user
+  enters are always their own grammar entries.
 - A filled field **replaces** the defaults of that field: only the user's words are
   commands, every combination of a point word and a team word in both orders. The
   default words it replaced are kept in the grammar as **decoys**, so the recogniser can
-  hear them as what they are instead of bending them into the new words (decided by
-  measurement, see below). User words are removed from the decoys.
+  hear them as what they are instead of bending them into the new words. Measured, it
+  made no difference for the test set (both ways the old commands never scored); kept
+  as the safer choice for real voices. User words are removed from the decoys.
 - "zurück"/"undo" stays fixed.
-- Each field has a "Reset" action that empties it and saves (validated like a save, since
-  the defaults could clash with a word in another field). "Save" stores all three fields.
+- Each field shows its defaults below it and has a reset icon (undo arrow, described
+  "Reset … to default") that empties it and saves (validated like a save, since the
+  defaults could clash with a word in another field). "Save words" stores all three
+  fields. The last save message is cleared when a field is edited, the panel closes or
+  the app language changes.
 - Validation on save, per language: entries are trimmed and lower-cased; empty entries
   between commas are ignored. Rejected, with a message naming the word:
   - more than one word in an entry ("punkt eins");
@@ -468,12 +479,13 @@ set scores after the fact, voice control of any of this.
 
 - Control strip: Undo = undo-arrow icon, Swap sides = swap-arrows icon, New match stays
   text (hold to reset), and one menu icon (three lines) replaces Settings and History.
-- Icons are 48 dp touch targets with 28 dp white glyphs on the dark strip; a long press
+- Icons are 48 dp touch targets with 30 dp white glyphs on the dark strip; a long press
   shows the label as a tooltip; each has a content description in both languages.
   Behaviour of each control is unchanged.
 - The menu opens the side panel. At its top a short list: Settings, History, Players,
   Statistics, About. Settings is selected when the panel opens and its content shows
-  below the list; About shows its content there instead. History, Players and
+  below the list; About shows its content there instead (scrolled into view, since the
+  list fills most of the panel in landscape). History, Players and
   Statistics open their full screens; Back from any of them returns to the scoreboard
   (Back from a match detail returns to History). The Statistics/Players buttons on the
   history screen are removed.
@@ -483,4 +495,37 @@ set scores after the fact, voice control of any of this.
 
 ### Measurements (VoiceSpottingTest, emulator)
 
-MEASUREMENTS
+Same synthetic rig as 3.2.0 (46 command clips × 4 conditions, 144 chatter streams). The
+synthetic voices vary slightly between emulator boots (same words, confidences a few
+hundredths apart), so 3.3.0 is also compared with the 3.2.0 grammar on the *same audio*
+(`sameAudioWithThe320Grammar`; four paired runs, three as in the table, one with 142 vs
+141 commands and 4 vs 4 chatter at both levels):
+
+| `VoiceSpottingTest` (emulator)                | 3.2.0 grammar   | 3.3.0 defaults            |
+|-----------------------------------------------|-----------------|---------------------------|
+| commands recognised (184), same audio         | 142             | 142                       |
+| chatter giving a command (144), same audio    | 4 Normal, 6 Relaxed | 5 Normal, 4 Relaxed   |
+| wrong command                                 | 0               | 0                         |
+| end of command → accepted                    | median 240 ms   | median 240 ms, max 930 ms |
+| spoken "Punk Blau"/"red points" (48)          | –               | 36                        |
+
+Across five separate 3.3.0 runs: 141–142 of 184 recognised, chatter 4–6 at Normal and
+4–6 at Relaxed. The one extra Normal trigger on the same audio is the price of "points"
+as a command word: "… leads by three points. Red serves …" can now give a point (as a
+decoy, "points" swallowed it in 3.2.0). The test gate is: same audio, at most one command
+fewer and at most one chatter trigger more than the 3.2.0 grammar.
+
+Rejected alternatives (earlier runs): "punk"/"points" as their own grammar entries gave
+132/184 and 34/48 variants; with additionally 0.15 confidence slack for the point word,
+136/184 but chatter rose to 7/144 at Relaxed. All 24 English variant clips scored; the
+German misses are the synthetic voice saying "Punk" as the English loanword, which the
+grammar hears as "kann".
+
+Replaced set (German: blue "himmel", red "feuer", point "treffer"), same conditions:
+
+| replaced set                                  | old defaults as decoys | without   |
+|-----------------------------------------------|------------------------|-----------|
+| "Treffer Himmel" etc. recognised (48)         | 47–48                  | 47–48     |
+| old "Punkt Blau" etc. scoring, Relaxed (48)   | 0                      | 0         |
+| German chatter giving a command (72)          | 0                      | 0         |
+| wrong command                                 | 0                      | 0         |
