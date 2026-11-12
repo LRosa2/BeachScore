@@ -138,7 +138,7 @@ private fun IconStripButton(icon: ImageVector, label: Int, onClick: () -> Unit, 
 }
 
 /** Material Symbols paths (Apache 2.0), drawn here so the big icon library is not needed. */
-private object StripIcons {
+internal object StripIcons {
     val Undo = icon("undo", "M12.5,8c-2.65,0 -5.05,0.99 -6.9,2.6L2,7v9h9l-3.62,-3.62c1.39,-1.16 3.16,-1.88 5.12,-1.88 3.54,0 6.55,2.31 7.6,5.5l2.37,-0.78C21.08,11.03 17.15,8 12.5,8z")
     val Swap = icon("swap", "M6.99,11L3,15l3.99,4v-3H14v-2H6.99v-3zM21,9l-3.99,-4v3H10v2h7.01v3L21,9z")
     val Menu = icon("menu", "M3,18h18v-2H3v2zm0,-5h18v-2H3v2zm0,-7v2h18V6H3z")

@@ -24,6 +24,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +39,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -111,6 +114,9 @@ fun SettingsSheet(
     onOpen: (MenuEntry) -> Unit = {},
 ) {
     var section by rememberSaveable { mutableStateOf(MenuEntry.SETTINGS) }
+    val scroll = rememberScrollState()
+    // In landscape the list fills most of the panel: bring About's lines into view.
+    LaunchedEffect(section) { if (section == MenuEntry.ABOUT) scroll.animateScrollTo(scroll.maxValue) }
     Box(
         Modifier
             .fillMaxSize()
@@ -129,7 +135,7 @@ fun SettingsSheet(
             color = MaterialTheme.colorScheme.surface,
         ) {
             Column(
-                Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
+                Modifier.verticalScroll(scroll).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -365,28 +371,26 @@ private fun VoiceWordsEditor(
     Labeled(R.string.voice_words, languageName) {
         fields.forEach { (field, label) ->
             val name = stringResource(label)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = texts[field].orEmpty(),
-                    onValueChange = { texts[field] = it; onEdited() },
-                    label = { Text(name) },
-                    placeholder = { Text(stringResource(R.string.voice_words_default, VoiceWords.display(defaults[field]))) },
-                    singleLine = true,
-                    enabled = save != WordsSave.Checking,
-                    modifier = Modifier.weight(1f).testTag("words_${field.name.lowercase()}"),
-                )
-                val resetDescription = stringResource(R.string.voice_words_reset_description, name)
-                TextButton(
-                    onClick = {
-                        texts[field] = ""
-                        onSave(language, texts.toMap())
-                    },
-                    enabled = save != WordsSave.Checking,
-                    modifier = Modifier
-                        .semantics { contentDescription = resetDescription }
-                        .testTag("words_reset_${field.name.lowercase()}"),
-                ) { Text(stringResource(R.string.voice_words_reset)) }
-            }
+            val resetDescription = stringResource(R.string.voice_words_reset_description, name)
+            OutlinedTextField(
+                value = texts[field].orEmpty(),
+                onValueChange = { texts[field] = it; onEdited() },
+                label = { Text(name) },
+                supportingText = { Text(stringResource(R.string.voice_words_default, VoiceWords.display(defaults[field]))) },
+                trailingIcon = {
+                    IconButton(
+                        onClick = {
+                            texts[field] = ""
+                            onSave(language, texts.toMap())
+                        },
+                        enabled = save != WordsSave.Checking,
+                        modifier = Modifier.testTag("words_reset_${field.name.lowercase()}"),
+                    ) { Icon(StripIcons.Undo, contentDescription = resetDescription) }
+                },
+                singleLine = true,
+                enabled = save != WordsSave.Checking,
+                modifier = Modifier.fillMaxWidth().testTag("words_${field.name.lowercase()}"),
+            )
         }
         Button(
             onClick = { onSave(language, texts.toMap()) },

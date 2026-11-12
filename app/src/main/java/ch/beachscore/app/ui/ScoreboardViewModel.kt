@@ -348,6 +348,8 @@ class ScoreboardViewModel(
     }
 
     private fun applySettings(new: Settings) {
+        // The voice-word fields now show the other language's words.
+        if (new.language != settings.language) setWordsSave(WordsSave.Idle)
         settings = new
         tapLock.durationMs = new.tapLockMs
         hardwareKeys.enabled = new.hardwareButtons

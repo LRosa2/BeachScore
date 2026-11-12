@@ -131,7 +131,6 @@
     <string name="voice_words_red">Red team</string>
     <string name="voice_words_point">Point</string>
     <string name="voice_words_default">Default: %1$s</string>
-    <string name="voice_words_reset">Reset</string>
     <string name="voice_words_reset_description">Reset %1$s to default</string>
     <string name="voice_words_save">Save words</string>
     <string name="voice_words_hint">Several words separated by commas. Short, common words cause more false points. Undo stays “%1$s”.</string>

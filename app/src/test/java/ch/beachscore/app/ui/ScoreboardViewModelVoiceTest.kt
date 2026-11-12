@@ -353,4 +353,13 @@ class ScoreboardViewModelVoiceTest {
         vm.onVoiceWordsEdited()
         assertEquals(WordsSave.Idle, vm.ui.wordsSave)
     }
+
+    @Test
+    fun `switching the language clears the last save message, which was about the other words`() = runTest {
+        val vm = viewModel()
+        vm.saveVoiceWords(Language.EN, fields())
+        assertEquals(WordsSave.Saved, vm.ui.wordsSave)
+        settingsStore.update { it.copy(language = Language.DE) }
+        assertEquals(WordsSave.Idle, vm.ui.wordsSave)
+    }
 }
