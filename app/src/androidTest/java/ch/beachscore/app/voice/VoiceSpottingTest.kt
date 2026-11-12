@@ -200,6 +200,52 @@ class VoiceSpottingTest {
         summary.forEach { line("# $it") }
     }
 
+    /**
+     * The synthetic voices differ a little from run to run, so 3.3.0 is compared with the
+     * 3.2.0 grammar on the same audio in one run. 3.2.0 = one point word, "points" a decoy
+     * (English); the German grammar was the same then.
+     */
+    @Test
+    fun sameAudioWithThe320Grammar() {
+        fun baseline(language: Language) = CommandWords.defaults(language).let { w ->
+            w.copy(point = w.point - w.alike, alike = emptySet(), replaced = if (language == Language.EN) listOf("points") else emptyList())
+        }
+        assertTrue(CommandParser.grammar(baseline(Language.EN)).contains("points"))
+        val summary = mutableListOf<String>()
+        val results = mutableListOf<Triple<Int, Int, Int>>() // hits, NORMAL triggers, RELAXED triggers
+        for ((label, words) in listOf<Pair<String, (Language) -> CommandWords>>("3.2.0" to ::baseline, "3.3.0" to CommandWords::defaults)) {
+            var hits = 0
+            for (condition in CONDITIONS) for (clip in commands) {
+                val run = run(words(clip.language), place(clip, condition).first, VoiceSensitivity.NORMAL)
+                if (run.accepted == listOf(clip.expected)) hits++ else line("paired-$label\tmiss\t$condition\t${clip.name}\t${describe(run.heard)}")
+            }
+            val chatter = mutableListOf<String>()
+            val triggers = mutableListOf<Int>()
+            for (sensitivity in listOf(VoiceSensitivity.NORMAL, VoiceSensitivity.RELAXED)) {
+                var count = 0
+                for (stream in chatterStreams) for (bed in listOf(false, true)) {
+                    val pcm = if (bed) withBed(stream.pcm, stream.language, stream.name.hashCode().toLong()) else stream.pcm
+                    val run = run(words(stream.language), pcm + ShortArray(RATE), sensitivity)
+                    if (run.accepted.isNotEmpty()) {
+                        count++
+                        line("paired-$label	$sensitivity	${stream.name}	$bed	TRIGGER ${run.accepted}	${describe(run.heard)}")
+                    }
+                }
+                chatter += "$count at $sensitivity"
+                triggers += count
+            }
+            summary += "same audio, $label grammar: ${hits} of ${commands.size * CONDITIONS.size} commands; chatter ${chatter.joinToString(", ")} (of ${chatterStreams.size * 2})"
+            results += Triple(hits, triggers[0], triggers[1])
+        }
+        summary.forEach { line("# $it") }
+        val (oldHits, oldNormal, oldRelaxed) = results[0]
+        val (newHits, newNormal, newRelaxed) = results[1]
+        val message = summary.joinToString("\n")
+        assertTrue(message, newHits >= oldHits - MAX_FEWER_COMMANDS_VS_320)
+        assertTrue(message, newNormal <= oldNormal + MAX_EXTRA_TRIGGERS_VS_320)
+        assertTrue(message, newRelaxed <= oldRelaxed + MAX_EXTRA_TRIGGERS_VS_320)
+    }
+
     @Test
     fun theModelVocabularyIsReadable() {
         val de = models.getValue(Language.DE)
@@ -267,10 +313,26 @@ class VoiceSpottingTest {
 
         /**
          * The chatter is deliberately full of command words, and sentences meet without a gap
-         * ("… das Team in Rot. Punkte …"). 3.1.0 gave a command in 20 of 144 streams at NORMAL, 3.2.0 4;
-         * more than this is a regression.
+         * ("… das Team in Rot. Punkte …"). 3.1.0 gave a command in 20 of 144 streams at NORMAL, 3.2.0 4.
+         * The synthetic voices vary between emulator boots: over five 3.3.0 runs 4-6 at NORMAL
+         * and RELAXED, and the 3.2.0 grammar on the same audio up to 6 as well. More than this is
+         * a regression; [sameAudioWithThe320Grammar] is the precise comparison.
          */
-        private const val MAX_CHATTER_TRIGGERS = 5
+        private const val MAX_CHATTER_TRIGGERS = 6
+
+        /**
+         * "points" is a point word since 3.3.0, so chatter such as "… three points. Red serves …"
+         * can now give a point: one more trigger than the 3.2.0 grammar on the same audio is
+         * accepted (four paired runs: NORMAL 5 against 4 three times and 4 against 4 once;
+         * RELAXED 4 against 6 three times and 4 against 4 once).
+         */
+        private const val MAX_EXTRA_TRIGGERS_VS_320 = 1
+
+        /**
+         * The same comparison for recognised commands. Four paired runs: 142 against 142 three
+         * times, 141 against 142 once ("points" is no longer a decoy, the rest is identical).
+         */
+        private const val MAX_FEWER_COMMANDS_VS_320 = 1
 
         /** Target speech level after normalising (about -21 dBFS). */
         private const val SPEECH_RMS = 3000.0
