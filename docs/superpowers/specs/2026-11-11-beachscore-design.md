@@ -37,13 +37,15 @@ announcement is audible outdoors.
 - The whole half is the tap target: a tap anywhere on a half adds one point to that team.
 - Each half shows the team's sets won, small, near the top (e.g. dots or a small number).
 - A thin control strip along the bottom centre, deliberately small and away from the main
-  tap areas: Undo, Swap sides, New match, Settings.
+  tap areas: Undo, Swap sides, New match, menu (since 3.3.0 Undo, Swap sides and the
+  menu are icons; see "3.3.0" at the end).
   - Undo: single tap, reverts the last scoring event (including a set that was just won).
     Disabled when there is nothing to undo.
   - Swap sides: exchanges which team is displayed left/right. Scores follow the team.
   - New match: long-press (about 1 s, with a visible progress fill) — resets points and
     sets to zero. A short tap does nothing but shows a hint "hold to reset".
-  - Settings: opens the settings sheet.
+  - Menu (was Settings): opens the side panel with Settings, History, Players,
+    Statistics and About.
 
 ### Multi-tap protection
 
@@ -377,7 +379,8 @@ games so the group can look at statistics afterwards.
   (e.g. 15:12, 13:15), result highlight for the winning side.
 - Match detail: lineups (editable), sets with scores and durations, delete match.
 - Reached from a new "History" button in the control strip. From the history screen:
-  "Statistics", "Players", "Export CSV". These screens may use normal (non-immersive
+  "Statistics", "Players", "Export CSV". (3.3.0: History, Players and Statistics are
+  reached from the menu; the history screen keeps only "Export CSV".) These screens may use normal (non-immersive
   tolerant) layouts but stay landscape; Back returns to the scoreboard.
 
 ### Statistics
@@ -420,3 +423,64 @@ games so the group can look at statistics afterwards.
 Cloud sync or sharing between phones, import, charts, per-point statistics screens
 (the point sequence is only stored and exported), player photos, team names, editing
 set scores after the fact, voice control of any of this.
+
+## 3.3.0 — configurable voice words and a new bottom bar (added 2026-11-12)
+
+### Voice words
+
+- Under Voice commands, three fields: "Blue team", "Red team", "Point". They are stored
+  separately for German and English; the panel shows the fields of the current app
+  language (recognition follows the app language), titled with that language.
+- A field holds one or more single words separated by commas. Empty means the defaults:
+
+  | Field | Deutsch          | English           |
+  |-------|------------------|-------------------|
+  | Blue  | blau             | blue              |
+  | Red   | rot              | red               |
+  | Point | punkt, punk      | point, points     |
+
+  "punk" and "points" are new defaults (Vosk often hears a short "Punkt"/"point" as
+  these); they are no longer decoys.
+- A filled field **replaces** the defaults of that field: only the user's words are
+  commands, every combination of a point word and a team word in both orders. The
+  default words it replaced are kept in the grammar as **decoys**, so the recogniser can
+  hear them as what they are instead of bending them into the new words (decided by
+  measurement, see below). User words are removed from the decoys.
+- "zurück"/"undo" stays fixed.
+- Each field has a "Reset" action that empties it and saves (validated like a save, since
+  the defaults could clash with a word in another field). "Save" stores all three fields.
+- Validation on save, per language: entries are trimmed and lower-cased; empty entries
+  between commas are ignored. Rejected, with a message naming the word:
+  - more than one word in an entry ("punkt eins");
+  - the undo word;
+  - a word used in two fields (counting the defaults of empty fields);
+  - a word the Vosk model of that language does not know (checked against the model's
+    own vocabulary, `vosk_model_find_word`; the model is loaded for the check, which
+    takes about a second). If the model cannot be loaded the words are not saved.
+- Hint under the fields: short common words cause more false points.
+- Everything from 3.2.0 (spotting, both orders, forced final, in-speech rule, echo
+  guard) works on the active word set: `CommandWords` (resolved from the defaults and
+  the user's fields) builds the grammar and drives `CommandParser` and
+  `EarlyFinalizer`. Changing the words restarts the recogniser. Lineup pills, TTS
+  announcements and team colours do not change.
+
+### Bottom bar and menu
+
+- Control strip: Undo = undo-arrow icon, Swap sides = swap-arrows icon, New match stays
+  text (hold to reset), and one menu icon (three lines) replaces Settings and History.
+- Icons are 48 dp touch targets with 28 dp white glyphs on the dark strip; a long press
+  shows the label as a tooltip; each has a content description in both languages.
+  Behaviour of each control is unchanged.
+- The menu opens the side panel. At its top a short list: Settings, History, Players,
+  Statistics, About. Settings is selected when the panel opens and its content shows
+  below the list; About shows its content there instead. History, Players and
+  Statistics open their full screens; Back from any of them returns to the scoreboard
+  (Back from a match detail returns to History). The Statistics/Players buttons on the
+  history screen are removed.
+- About: app name, "Luis Rosa", version name and release date. Both come from
+  `BuildConfig` (`VERSION_NAME`, and `RELEASE_DATE` = the build date, ISO), the date
+  formatted for the app language. No hand-maintained strings.
+
+### Measurements (VoiceSpottingTest, emulator)
+
+MEASUREMENTS
