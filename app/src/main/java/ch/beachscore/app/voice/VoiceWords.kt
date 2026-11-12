@@ -42,6 +42,13 @@ data class CommandWords(
     val red: List<String>,
     val undo: String,
     val replaced: List<String> = emptyList(),
+    /**
+     * Default point words that sound like another point word ("punk" ~ "punkt", "points" ~
+     * "point"). They count when heard but get no grammar entry of their own: the closed grammar
+     * hears them as the base word, while as separate entries they split its confidence
+     * (measured: a clear "point" fell to 0.50-0.64). Empty when the user set the point words.
+     */
+    val alike: Set<String> = emptySet(),
 ) {
     val all: List<String> get() = point + blue + red + undo
 
@@ -51,6 +58,7 @@ data class CommandWords(
             Language.EN to CustomWords(blue = listOf("blue"), red = listOf("red"), point = listOf("point", "points")),
         )
         private val UNDO = mapOf(Language.DE to "zurück", Language.EN to "undo")
+        private val ALIKE = mapOf(Language.DE to setOf("punk"), Language.EN to setOf("points"))
 
         fun defaults(language: Language): CommandWords = of(language, CustomWords())
 
@@ -70,6 +78,7 @@ data class CommandWords(
                 red = pick(WordField.RED),
                 undo = UNDO.getValue(language),
                 replaced = replaced.filter { it !in active },
+                alike = if (custom.point.isEmpty()) ALIKE.getValue(language) else emptySet(),
             )
         }
     }

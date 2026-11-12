@@ -171,13 +171,44 @@ class VoiceSpottingTest {
         assertTrue(summary.joinToString("\n"), productionOldScored == 0 && productionWrong == 0)
     }
 
+    /**
+     * 3.3.0: "punk"/"points" as default point words. Spoken variant commands ("Punk Blau",
+     * "red points") and all regular commands, with the production grammar (variants heard
+     * through "punkt"/"point") and with the variants as grammar entries of their own.
+     */
+    @Test
+    fun alikePointVariants() {
+        val summary = mutableListOf<String>()
+        for (mode in listOf("absorbed", "separate")) {
+            fun words(language: Language) = CommandWords.defaults(language).let { if (mode == "separate") it.copy(alike = emptySet()) else it }
+            for ((label, clips) in listOf("variant commands" to variantCommands, "regular commands" to commands)) {
+                if (mode == "absorbed" && label == "regular commands") continue // commandsAreSpottedWithoutSilenceAroundThem
+                var hits = 0
+                var n = 0
+                var wrong = 0
+                for (condition in CONDITIONS) for (clip in clips) {
+                    val run = run(words(clip.language), place(clip, condition).first, VoiceSensitivity.NORMAL)
+                    n++
+                    val hit = run.accepted == listOf(clip.expected)
+                    if (hit) hits++
+                    if (run.accepted.any { it != clip.expected }) wrong++
+                    line("alike-$mode	$condition	${clip.name}	${if (hit) "HIT" else "miss"}	${describe(run.heard)}")
+                }
+                summary += "point variants $mode, $label: $hits of $n recognised, wrong $wrong"
+            }
+        }
+        summary.forEach { line("# $it") }
+    }
+
     @Test
     fun theModelVocabularyIsReadable() {
         val de = models.getValue(Language.DE)
         val en = models.getValue(Language.EN)
         assertTrue(VoskVocabulary.knows(de, "blau") && VoskVocabulary.knows(de, "zurück") && VoskVocabulary.knows(de, "punk"))
         assertTrue(VoskVocabulary.knows(en, "points") && VoskVocabulary.knows(en, "undo"))
-        assertTrue(!VoskVocabulary.knows(de, "xqzvt") && !VoskVocabulary.knows(en, "blau"))
+        for ((model, word) in listOf(de to "xqzvt", en to "xqzvt", de to "blaux", en to "bluex")) {
+            assertTrue("model knows $word", !VoskVocabulary.knows(model, word))
+        }
     }
 
     private fun run(language: Language, pcm: ShortArray, sensitivity: VoiceSensitivity): Run =
@@ -192,7 +223,9 @@ class VoiceSpottingTest {
             var i = 0
             fun take(h: Heard?, pos: Int) {
                 h ?: return
-                heard += h
+                // The report shows each word's confidence: "point:0.84 blue:1.00".
+                val words = rec.lastJson?.let { VoskResult.parse(it) }?.words.orEmpty()
+                heard += if (words.isEmpty()) h else h.copy(text = words.joinToString(" ") { "${it.word}:${"%.2f".format(Locale.ROOT, it.confidence)}" })
                 (h.verdict as? Verdict.Accepted)?.let { accepted += it.command; at += pos }
             }
             while (i < pcm.size) {
@@ -255,6 +288,11 @@ class VoiceSpottingTest {
         private val models = mutableMapOf<Language, Model>()
         private val commands = mutableListOf<Clip>()
         private val customCommands = mutableListOf<Clip>()
+        private val variantCommands = mutableListOf<Clip>()
+        private val VARIANT_COMMANDS = listOf(
+            Language.DE to ("point_blue" to "Punk Blau"), Language.DE to ("point_red" to "Rot Punk"),
+            Language.EN to ("point_blue" to "points blue"), Language.EN to ("point_red" to "red points"),
+        )
         private val chatterStreams = mutableListOf<Clip>()
         private val neutral = mutableMapOf<Language, List<ShortArray>>()
         private val babble = mutableMapOf<Language, ShortArray>()
@@ -317,6 +355,7 @@ class VoiceSpottingTest {
             val texts = mutableListOf<Triple<Language, String, String>>() // language, key, text
             DE_COMMANDS.forEach { texts += Triple(Language.DE, "cmd:" + it.first, it.second) }
             CUSTOM_COMMANDS.forEach { texts += Triple(Language.DE, "custom:" + it.first, it.second) }
+            VARIANT_COMMANDS.forEach { (language, c) -> texts += Triple(language, "variant:" + c.first, c.second) }
             EN_COMMANDS.forEach { texts += Triple(Language.EN, "cmd:" + it.first, it.second) }
             DE_NEUTRAL.forEach { texts += Triple(Language.DE, "neutral", it) }
             EN_NEUTRAL.forEach { texts += Triple(Language.EN, "neutral", it) }
@@ -331,6 +370,8 @@ class VoiceSpottingTest {
                     val clip = normalise(trim(pcm))
                     val slug = text.lowercase().replace(Regex("[^a-zäöüß]+"), "_").trim('_')
                     when {
+                        kind.startsWith("variant:") ->
+                            variantCommands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("variant:")), clip)
                         kind.startsWith("custom:") ->
                             customCommands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("custom:")), clip)
                         kind.startsWith("cmd:") -> commands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("cmd:")), clip)

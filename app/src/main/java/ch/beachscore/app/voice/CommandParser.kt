@@ -65,12 +65,12 @@ object CommandParser {
 
     /**
      * The closed grammar for the recogniser: every point word with every team word in both
-     * orders, undo, the decoys and `[unk]`. Default words a user field replaced become decoys
+     * orders (except the [CommandWords.alike] variants), undo, the decoys and `[unk]`. Default words a user field replaced become decoys
      * (heard as themselves rather than bent into the new words); the active words never are.
      */
     fun grammar(words: CommandWords): List<String> {
         val commands = buildList {
-            for (p in words.point) for (t in words.blue + words.red) {
+            for (p in words.point - words.alike) for (t in words.blue + words.red) {
                 add("$p $t")
                 add("$t $p")
             }

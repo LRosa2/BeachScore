@@ -243,19 +243,31 @@ class CommandParserTest {
 
     @Test
     fun `grammar lists the phrases of one language plus unknown`() {
-        assertEquals(
-            listOf("point blue", "blue point", "point red", "red point", "points blue", "blue points", "points red", "red points", "undo"),
-            CommandParser.grammar(Language.EN).take(9),
-        )
-        assertEquals(
-            listOf("punkt blau", "blau punkt", "punkt rot", "rot punkt", "punk blau", "blau punk", "punk rot", "rot punk", "zurück"),
-            CommandParser.grammar(Language.DE).take(9),
-        )
+        assertEquals(listOf("point blue", "blue point", "point red", "red point", "undo"), CommandParser.grammar(Language.EN).take(5))
+        assertEquals(listOf("punkt blau", "blau punkt", "punkt rot", "rot punkt", "zurück"), CommandParser.grammar(Language.DE).take(5))
         for (language in Language.entries) {
             assertEquals("[unk]", CommandParser.grammar(language).last())
-            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(9).dropLast(1))
+            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(5).dropLast(1))
         }
-        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","punk blau","""))
+        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","zurück","der","""))
+    }
+
+    @Test
+    fun `the alike default variants are heard through their base word, never as decoys`() {
+        // As separate grammar entries "points"/"punk" split the confidence of a clear "point"
+        // (0.50-0.64 instead of 1.00, VoiceSpottingTest); a closed grammar hears them as the base word.
+        assertEquals(setOf("punk"), CommandWords.defaults(Language.DE).alike)
+        assertEquals(setOf("points"), CommandWords.defaults(Language.EN).alike)
+        for (language in Language.entries) {
+            val grammar = CommandParser.grammar(language)
+            for (variant in CommandWords.defaults(language).alike) {
+                assertFalse(grammar.any { it == variant || it.split(' ').contains(variant) }, variant)
+            }
+        }
+        // A user's point words are all their own entries.
+        val custom = CommandWords.of(Language.EN, CustomWords(point = listOf("point", "points")))
+        assertEquals(emptySet<String>(), custom.alike)
+        assertTrue("points blue" in CommandParser.grammar(custom))
     }
 
     @Test
