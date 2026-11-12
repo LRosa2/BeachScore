@@ -112,11 +112,82 @@ class VoiceSpottingTest {
         assertTrue("too many false triggers:\n" + triggers.joinToString("\n"), worst <= MAX_CHATTER_TRIGGERS)
     }
 
-    private fun run(language: Language, pcm: ShortArray, sensitivity: VoiceSensitivity): Run {
+    /**
+     * 3.3.0: a replaced word set ([CUSTOM], German). Its own commands must be spotted like the
+     * defaults, and the old default commands must no longer score. Measured twice: with the
+     * replaced default words as decoys in the grammar (production) and without them.
+     */
+    @Test
+    fun customWordsReplaceTheDefaults() {
+        for (word in CUSTOM.all) assertTrue("model lacks $word", VoskVocabulary.knows(models.getValue(Language.DE), word))
+        val summary = mutableListOf<String>()
+        var productionOldScored = -1
+        var productionWrong = -1
+        for ((label, words) in listOf("decoys" to CUSTOM, "no-decoys" to CUSTOM.copy(replaced = emptyList()))) {
+            var hits = 0
+            var n = 0
+            val wrong = mutableListOf<String>()
+            val latencies = mutableListOf<Int>()
+            for (condition in CONDITIONS) for (clip in customCommands) {
+                val (pcm, end) = place(clip, condition)
+                val run = run(words, pcm, VoiceSensitivity.NORMAL)
+                n++
+                val hit = run.accepted == listOf(clip.expected)
+                if (hit) {
+                    hits++
+                    latencies += (run.acceptedAt.first() - end) * 1000 / RATE
+                }
+                if (run.accepted.any { it != clip.expected }) wrong += "$condition ${clip.name}: ${run.heard}"
+                line("custom-$label	$condition	${clip.name}	${if (hit) "HIT" else "miss"}	${describe(run.heard)}")
+            }
+            var oldScored = 0
+            var oldN = 0
+            val oldPoints = commands.filter { it.language == Language.DE && it.expected is ScoreCommand.TeamPoint }
+            for (condition in CONDITIONS) for (clip in oldPoints) {
+                val run = run(words, place(clip, condition).first, VoiceSensitivity.RELAXED)
+                oldN++
+                val scored = run.accepted.any { it is ScoreCommand.TeamPoint }
+                if (scored) oldScored++
+                line("old-default-$label	$condition	${clip.name}	${if (scored) "SCORED ${run.accepted}" else "ok"}	${describe(run.heard)}")
+            }
+            var triggers = 0
+            var streams = 0
+            for (stream in chatterStreams.filter { it.language == Language.DE }) for (bed in listOf(false, true)) {
+                val pcm = if (bed) withBed(stream.pcm, stream.language, stream.name.hashCode().toLong()) else stream.pcm
+                val run = run(words, pcm + ShortArray(RATE), VoiceSensitivity.NORMAL)
+                streams++
+                if (run.accepted.isNotEmpty()) triggers++
+                line("chatter-$label	${stream.name}	$bed	${if (run.accepted.isEmpty()) "ok" else "TRIGGER ${run.accepted}"}	${describe(run.heard)}")
+            }
+            summary += "custom words ($label): $hits of $n recognised, latency ${stats(latencies)}, wrong ${wrong.size}; " +
+                "old default point commands scoring (RELAXED): $oldScored of $oldN; German chatter giving a command: $triggers of $streams"
+            wrong.forEach { line("WRONG custom-$label $it") }
+            if (words == CUSTOM) {
+                productionOldScored = oldScored
+                productionWrong = wrong.size
+            }
+        }
+        summary.forEach { line("# $it") }
+        assertTrue(summary.joinToString("\n"), productionOldScored == 0 && productionWrong == 0)
+    }
+
+    @Test
+    fun theModelVocabularyIsReadable() {
+        val de = models.getValue(Language.DE)
+        val en = models.getValue(Language.EN)
+        assertTrue(VoskVocabulary.knows(de, "blau") && VoskVocabulary.knows(de, "zurück") && VoskVocabulary.knows(de, "punk"))
+        assertTrue(VoskVocabulary.knows(en, "points") && VoskVocabulary.knows(en, "undo"))
+        assertTrue(!VoskVocabulary.knows(de, "xqzvt") && !VoskVocabulary.knows(en, "blau"))
+    }
+
+    private fun run(language: Language, pcm: ShortArray, sensitivity: VoiceSensitivity): Run =
+        run(CommandWords.defaults(language), pcm, sensitivity)
+
+    private fun run(words: CommandWords, pcm: ShortArray, sensitivity: VoiceSensitivity): Run {
         val accepted = mutableListOf<ScoreCommand>()
         val heard = mutableListOf<Heard>()
         val at = mutableListOf<Int>()
-        CommandRecognizer(models.getValue(language), language, sensitivity.minConfidence).use { rec ->
+        CommandRecognizer(models.getValue(words.language), words, sensitivity.minConfidence).use { rec ->
             val chunk = RATE / 10
             var i = 0
             fun take(h: Heard?, pos: Int) {
@@ -171,8 +242,19 @@ class VoiceSpottingTest {
         /** Target speech level after normalising (about -21 dBFS). */
         private const val SPEECH_RMS = 3000.0
 
+        /** A sensible German replacement set: "Treffer Himmel" / "Feuer Treffer" ... */
+        private val CUSTOM = CommandWords.of(
+            Language.DE,
+            CustomWords(blue = listOf("himmel"), red = listOf("feuer"), point = listOf("treffer")),
+        )
+        private val CUSTOM_COMMANDS = listOf(
+            "point_blue" to "Treffer Himmel", "point_red" to "Treffer Feuer",
+            "point_blue" to "Himmel Treffer", "point_red" to "Feuer Treffer",
+        )
+
         private val models = mutableMapOf<Language, Model>()
         private val commands = mutableListOf<Clip>()
+        private val customCommands = mutableListOf<Clip>()
         private val chatterStreams = mutableListOf<Clip>()
         private val neutral = mutableMapOf<Language, List<ShortArray>>()
         private val babble = mutableMapOf<Language, ShortArray>()
@@ -234,6 +316,7 @@ class VoiceSpottingTest {
 
             val texts = mutableListOf<Triple<Language, String, String>>() // language, key, text
             DE_COMMANDS.forEach { texts += Triple(Language.DE, "cmd:" + it.first, it.second) }
+            CUSTOM_COMMANDS.forEach { texts += Triple(Language.DE, "custom:" + it.first, it.second) }
             EN_COMMANDS.forEach { texts += Triple(Language.EN, "cmd:" + it.first, it.second) }
             DE_NEUTRAL.forEach { texts += Triple(Language.DE, "neutral", it) }
             EN_NEUTRAL.forEach { texts += Triple(Language.EN, "neutral", it) }
@@ -248,6 +331,8 @@ class VoiceSpottingTest {
                     val clip = normalise(trim(pcm))
                     val slug = text.lowercase().replace(Regex("[^a-zäöüß]+"), "_").trim('_')
                     when {
+                        kind.startsWith("custom:") ->
+                            customCommands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("custom:")), clip)
                         kind.startsWith("cmd:") -> commands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("cmd:")), clip)
                         kind == "neutral" -> neutralClips.getOrPut(language) { mutableListOf() } += clip
                         else -> chatterClips.getOrPut(language) { mutableListOf() } += "${language.tag}__tts${v}__$slug" to clip
