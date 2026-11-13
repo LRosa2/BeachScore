@@ -292,7 +292,9 @@ class ScoreboardViewModel(
         // Without pauses, noise right after a command arrives as its own "[unk]" result; it
         // must not replace the command's line before it could be read.
         val shown = _uiState.value.voice.lastHeard
-        if (shown?.verdict is Verdict.Accepted && heard.text.split(' ').all { it == CommandParser.UNKNOWN_WORD }) return
+        // The same for a half that waits for its other word (noise between the halves).
+        val keep = shown?.verdict is Verdict.Accepted || shown?.verdict == Verdict.Rejected(RejectReason.INCOMPLETE)
+        if (keep && heard.text.split(' ').all { it == CommandParser.UNKNOWN_WORD }) return
         heardJob?.cancel()
         _uiState.update { it.copy(voice = it.voice.copy(lastHeard = heard.copy(verdict = verdict), heardSeq = it.voice.heardSeq + 1)) }
         heardJob = viewModelScope.launch {
@@ -321,7 +323,7 @@ class ScoreboardViewModel(
             updateSettings { it.copy(voiceCommands = false) }
         }
         val want = match != null && settings.voiceCommands && foreground && scoreboardVisible && micPermission
-        if (want) voice.start(settings.language, settings.voiceSensitivity, settings.microphone, settings.commandWords()) else voice.stop()
+        if (want) voice.start(settings.language, settings.voiceSensitivity, settings.microphone, settings.commandWords(), settings.voicePauseMs) else voice.stop()
         if (!want || !settings.showHeard) {
             heardJob?.cancel()
             _uiState.update { it.copy(voice = it.voice.copy(lastHeard = null)) }

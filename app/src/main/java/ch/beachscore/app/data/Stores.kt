@@ -6,6 +6,7 @@ import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.voice.CommandWords
 import ch.beachscore.app.voice.CustomWords
+import ch.beachscore.app.voice.HalfJoiner
 import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.VoiceSensitivity
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,8 @@ data class Settings(
     val microphone: MicChoice? = null,
     /** The user's voice words per language; a missing language or empty field means the defaults. */
     val voiceWords: Map<Language, CustomWords> = emptyMap(),
+    /** "Pause between words": longest pause between the two words of a point command (3.3.1). */
+    val voicePauseMs: Long = HalfJoiner.DEFAULT_PAUSE_MS,
 ) {
     /** The words the recogniser listens for in the current language. */
     fun commandWords(): CommandWords = CommandWords.of(language, voiceWords[language] ?: CustomWords())
@@ -33,6 +36,7 @@ data class Settings(
     fun sanitized(): Settings = copy(
         pointsPerSet = pointsPerSet.takeIf { it in MatchState.ALLOWED_TARGETS } ?: MatchState.DEFAULT_TARGET,
         tapLockMs = (tapLockMs.coerceIn(TapLock.MIN_MS, TapLock.MAX_MS) / TapLock.STEP_MS) * TapLock.STEP_MS,
+        voicePauseMs = voicePauseMs.takeIf { it in HalfJoiner.PAUSE_CHOICES_MS } ?: HalfJoiner.DEFAULT_PAUSE_MS,
     )
 }
 

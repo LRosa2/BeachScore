@@ -39,6 +39,9 @@
     <string name="voice_sensitivity_normal">Normal</string>
     <string name="voice_sensitivity_relaxed">Relaxed</string>
     <string name="voice_sensitivity_hint">Strict: fewer wrong points. Relaxed: accepts less clear commands from further away.</string>
+    <string name="voice_pause">Pause between words</string>
+    <string name="voice_pause_seconds">%1$d s</string>
+    <string name="voice_pause_hint">Longest pause between “point” and the team, e.g. “point … blue”. Longer catches slower commands but also more chatter.</string>
     <string name="show_heard">Show what was heard</string>
     <string name="voice_preparing">Preparing speech recognition … %1$d%%</string>
     <string name="voice_failed_model">Speech recognition could not be loaded.</string>

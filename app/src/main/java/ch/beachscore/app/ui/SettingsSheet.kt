@@ -67,6 +67,7 @@ import ch.beachscore.app.score.MatchState
 import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.voice.MicRow
 import ch.beachscore.app.voice.Microphones
+import ch.beachscore.app.voice.HalfJoiner
 import ch.beachscore.app.voice.VoiceSensitivity
 import ch.beachscore.app.voice.CommandWords
 import ch.beachscore.app.voice.CustomWords
@@ -305,6 +306,22 @@ private fun VoiceSection(
             }
         }
         Text(stringResource(R.string.voice_sensitivity_hint), style = MaterialTheme.typography.bodySmall)
+        Labeled(R.string.voice_pause) {
+            val choices = HalfJoiner.PAUSE_CHOICES_MS
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                choices.forEachIndexed { i, ms ->
+                    SegmentedButton(
+                        selected = settings.voicePauseMs == ms,
+                        onClick = { onChange { it.copy(voicePauseMs = ms) } },
+                        shape = SegmentedButtonDefaults.itemShape(i, choices.size),
+                        modifier = Modifier.testTag("pause_${ms / 1000}"),
+                        icon = {},
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                    ) { Text(stringResource(R.string.voice_pause_seconds, ms / 1000), maxLines = 1, softWrap = false, fontSize = 14.sp) }
+                }
+            }
+        }
+        Text(stringResource(R.string.voice_pause_hint), style = MaterialTheme.typography.bodySmall)
         SwitchRow(R.string.show_heard, settings.showHeard, "show_heard") { on -> onChange { it.copy(showHeard = on) } }
     }
 }

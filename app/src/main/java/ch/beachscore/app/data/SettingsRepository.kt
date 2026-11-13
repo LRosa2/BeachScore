@@ -43,6 +43,7 @@ class SettingsRepository(
             prefs[VOICE_SENSITIVITY] = new.voiceSensitivity.name
             prefs[SHOW_HEARD] = new.showHeard
             prefs[MICROPHONE] = new.microphone?.encode() ?: ""
+            prefs[VOICE_PAUSE_MS] = new.voicePauseMs
             for (language in Language.entries) {
                 val words = new.voiceWords[language] ?: CustomWords()
                 for (field in WordField.entries) prefs[wordsKey(language, field)] = VoiceWords.encode(words[field])
@@ -63,6 +64,7 @@ class SettingsRepository(
                 ?: defaults.voiceSensitivity,
             showHeard = this[SHOW_HEARD] ?: defaults.showHeard,
             microphone = MicChoice.decode(this[MICROPHONE]),
+            voicePauseMs = this[VOICE_PAUSE_MS] ?: defaults.voicePauseMs,
             voiceWords = Language.entries.associateWith { language ->
                 WordField.entries.fold(CustomWords()) { words, field -> words.with(field, VoiceWords.decode(this[wordsKey(language, field)])) }
             }.filterValues { !it.isEmpty },
@@ -79,6 +81,7 @@ class SettingsRepository(
         val VOICE_SENSITIVITY = stringPreferencesKey("voice_sensitivity")
         val SHOW_HEARD = booleanPreferencesKey("show_heard")
         val MICROPHONE = stringPreferencesKey("microphone")
+        val VOICE_PAUSE_MS = longPreferencesKey("voice_pause_ms")
 
         /** "voice_words_de_blue", ...: comma separated, empty for the defaults. */
         fun wordsKey(language: Language, field: WordField) =

@@ -34,6 +34,9 @@
     <string name="voice_sensitivity_normal">Normal</string>
     <string name="voice_sensitivity_relaxed">Locker</string>
     <string name="voice_sensitivity_hint">Streng: weniger falsche Punkte. Locker: nimmt auch undeutlichere Befehle aus grösserer Entfernung an.</string>
+    <string name="voice_pause">Pause zwischen den Wörtern</string>
+    <string name="voice_pause_seconds">%1$d s</string>
+    <string name="voice_pause_hint">Längste Pause zwischen „Punkt“ und dem Team, z. B. „Punkt … Blau“. Länger erkennt langsamere Befehle, aber auch mehr Gerede.</string>
     <string name="show_heard">Gehörtes anzeigen</string>
     <string name="voice_preparing">Spracherkennung wird vorbereitet … %1$d %%</string>
     <string name="voice_failed_model">Die Spracherkennung konnte nicht geladen werden.</string>

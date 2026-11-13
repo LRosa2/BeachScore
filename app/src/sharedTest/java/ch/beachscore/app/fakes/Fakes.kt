@@ -90,12 +90,17 @@ class FakeVoice : VoiceControl {
     var words: CommandWords? = null
         private set
 
-    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords) {
-        if (listening == language to sensitivity && this.microphone == microphone && this.words == words) return
-        if (listening != language to sensitivity || this.words != words) startCount++
+    /** Pause between words of the last start(). */
+    var maxPauseMs: Long? = null
+        private set
+
+    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords, maxPauseMs: Long) {
+        if (listening == language to sensitivity && this.microphone == microphone && this.words == words && this.maxPauseMs == maxPauseMs) return
+        if (listening != language to sensitivity || this.words != words || this.maxPauseMs != maxPauseMs) startCount++
         listening = language to sensitivity
         this.microphone = microphone
         this.words = words
+        this.maxPauseMs = maxPauseMs
         status.value = VoiceStatus.Listening
     }
 

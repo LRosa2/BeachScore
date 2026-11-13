@@ -32,13 +32,15 @@ interface VoiceControl {
 
     /**
      * Starts (or reconfigures) listening; idempotent for the same arguments. A new
-     * [microphone] (null: automatic) is applied without reloading the model.
+     * [microphone] (null: automatic) is applied without reloading the model. [maxPauseMs] is
+     * the longest pause between the two words of a point command ([HalfJoiner]).
      */
     fun start(
         language: Language,
         sensitivity: VoiceSensitivity,
         microphone: MicChoice? = null,
         words: CommandWords = CommandWords.defaults(language),
+        maxPauseMs: Long = HalfJoiner.DEFAULT_PAUSE_MS,
     )
     fun stop()
 

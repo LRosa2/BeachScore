@@ -90,7 +90,7 @@ class VoiceInput(
     private var choice: MicChoice? = null
 
     private var job: Job? = null
-    private data class Config(val language: Language, val sensitivity: VoiceSensitivity, val words: CommandWords)
+    private data class Config(val language: Language, val sensitivity: VoiceSensitivity, val words: CommandWords, val maxPauseMs: Long)
 
     private var config: Config? = null
 
@@ -116,18 +116,18 @@ class VoiceInput(
     }
 
     @Synchronized
-    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords) {
+    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords, maxPauseMs: Long) {
         if (choice != microphone) {
             choice = microphone
             routingChanges.value++
         }
-        val wanted = Config(language, sensitivity, words)
+        val wanted = Config(language, sensitivity, words, maxPauseMs)
         if (config == wanted && job?.isActive == true) return
         config = wanted
         val previous = job
         job = scope.launch(Dispatchers.Default) {
             previous?.cancelAndJoin() // the microphone must be released before it is reopened
-            listen(language, sensitivity, words)
+            listen(wanted)
         }
     }
 
@@ -151,9 +151,9 @@ class VoiceInput(
         }
     }
 
-    private suspend fun listen(language: Language, sensitivity: VoiceSensitivity, words: CommandWords) {
+    private suspend fun listen(config: Config) {
         val model = try {
-            loadModel(language)
+            loadModel(config.language)
         } catch (e: Exception) {
             Log.e(TAG, "speech model unavailable", e)
             _status.value = VoiceStatus.Failed(VoiceStatus.Failed.Reason.MODEL)
@@ -161,7 +161,7 @@ class VoiceInput(
         }
         if (!currentCoroutineContext().isActive) return
 
-        CommandRecognizer(model, words, sensitivity.minConfidence).use { recognizer ->
+        CommandRecognizer(model, config.words, config.sensitivity.minConfidence, maxPauseMs = config.maxPauseMs).use { recognizer ->
             val gate = EchoGate(echoGuard)
             var failuresInARow = 0
             try {

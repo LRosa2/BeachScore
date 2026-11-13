@@ -165,6 +165,26 @@ class ScoreboardViewModelVoiceTest {
     }
 
     @Test
+    fun `noise while a half waits does not hide the waiting line`() = runTest {
+        val vm = viewModel()
+        voice.hear("[unk] point", Verdict.Rejected(RejectReason.INCOMPLETE), 1.0)
+        voice.hear("[unk]", Verdict.Rejected(RejectReason.UNKNOWN), 0.3)
+        assertEquals("[unk] point", vm.ui.voice.lastHeard!!.text)
+    }
+
+    @Test
+    fun `the pause between words goes to the voice input and a change restarts it`() = runTest {
+        val vm = viewModel()
+        assertEquals(2000L, voice.maxPauseMs, "default 2 s")
+        assertEquals(2000L, vm.ui.settings.voicePauseMs)
+        val starts = voice.startCount
+        settingsStore.update { it.copy(voicePauseMs = 3000L) }
+        assertEquals(3000L, voice.maxPauseMs)
+        assertEquals(starts + 1, voice.startCount)
+        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening, "still listening")
+    }
+
+    @Test
     fun `diagnostics line can be switched off`() = runTest {
         settingsStore.update { it.copy(showHeard = false) }
         val vm = viewModel()
