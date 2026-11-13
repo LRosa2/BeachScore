@@ -68,6 +68,8 @@
     <string name="reason_echo_guard">own announcement</string>
     <string name="reason_set_won">set is over</string>
     <string name="reason_nothing_to_undo">nothing to undo</string>
+    <string name="reason_incomplete">waiting for the other word</string>
+    <string name="reason_pause_too_long">pause too long</string>
 
     <!-- Phase 3: history, players, statistics -->
     <string name="history">History</string>

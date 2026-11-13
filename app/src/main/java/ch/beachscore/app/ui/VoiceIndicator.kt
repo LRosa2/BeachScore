@@ -113,6 +113,8 @@ private fun reasonText(reason: RejectReason): Int = when (reason) {
     RejectReason.LOCKED -> R.string.reason_locked
     RejectReason.SET_WON -> R.string.reason_set_won
     RejectReason.NOTHING_TO_UNDO -> R.string.reason_nothing_to_undo
+    RejectReason.INCOMPLETE -> R.string.reason_incomplete
+    RejectReason.PAUSE_TOO_LONG -> R.string.reason_pause_too_long
 }
 
 /** A simple microphone drawn on a canvas (no icon library needed). */

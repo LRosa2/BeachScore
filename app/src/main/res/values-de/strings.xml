@@ -63,6 +63,8 @@
     <string name="reason_echo_guard">eigene Ansage</string>
     <string name="reason_set_won">Satz ist beendet</string>
     <string name="reason_nothing_to_undo">nichts zum Zurücknehmen</string>
+    <string name="reason_incomplete">wartet auf das zweite Wort</string>
+    <string name="reason_pause_too_long">Pause zu lang</string>
 
     <!-- Phase 3: Verlauf, Spieler, Statistik -->
     <string name="history">Verlauf</string>

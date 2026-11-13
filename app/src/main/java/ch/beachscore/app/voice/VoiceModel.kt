@@ -35,6 +35,10 @@ enum class RejectReason {
     /** A point while the set-won overlay is shown. */
     SET_WON,
     NOTHING_TO_UNDO,
+    /** Half a point command ("punkt"); waiting for the other word (see [HalfJoiner]). */
+    INCOMPLETE,
+    /** The two halves of a point command, but the pause between them was too long. */
+    PAUSE_TOO_LONG,
 }
 
 sealed interface Verdict {

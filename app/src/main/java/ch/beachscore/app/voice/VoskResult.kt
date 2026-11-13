@@ -7,7 +7,8 @@ package ch.beachscore.app.voice
  * are always escaped: Android's ICU regex engine rejects a bare `}` that Java accepts.
  */
 data class VoskResult(val text: String, val words: List<Word>) {
-    data class Word(val word: String, val confidence: Double)
+    /** [start] and [end]: seconds of audio since the recogniser was created (null if absent). */
+    data class Word(val word: String, val confidence: Double, val start: Double? = null, val end: Double? = null)
 
     companion object {
         private val PARTIAL = Regex(""""partial"\s*:\s*"((?:[^"\\]|\\.)*)"""")
@@ -16,6 +17,8 @@ data class VoskResult(val text: String, val words: List<Word>) {
         private val OBJECT = Regex("""\{([^\{\}]*)\}""")
         private val WORD = Regex(""""word"\s*:\s*"((?:[^"\\]|\\.)*)"""")
         private val CONF = Regex(""""conf"\s*:\s*([0-9.eE+-]+)""")
+        private val START = Regex(""""start"\s*:\s*([0-9.eE+-]+)""")
+        private val END = Regex(""""end"\s*:\s*([0-9.eE+-]+)""")
 
         fun parse(json: String): VoskResult? {
             val text = TEXT.find(json)?.groupValues?.get(1)?.let(::unescape) ?: return null
@@ -24,7 +27,12 @@ data class VoskResult(val text: String, val words: List<Word>) {
                     val body = obj.groupValues[1]
                     val word = WORD.find(body)?.groupValues?.get(1)?.let(::unescape) ?: return@mapNotNull null
                     val conf = CONF.find(body)?.groupValues?.get(1)?.toDoubleOrNull() ?: return@mapNotNull null
-                    Word(word, conf)
+                    Word(
+                        word,
+                        conf,
+                        START.find(body)?.groupValues?.get(1)?.toDoubleOrNull(),
+                        END.find(body)?.groupValues?.get(1)?.toDoubleOrNull(),
+                    )
                 }.toList()
             }.orEmpty()
             return VoskResult(text.trim(), words)
