@@ -529,3 +529,44 @@ Replaced set (German: blue "himmel", red "feuer", point "treffer"), same conditi
 | old "Punkt Blau" etc. scoring, Relaxed (48)   | 0                      | 0         |
 | German chatter giving a command (72)          | 0                      | 0         |
 | wrong command                                 | 0                      | 0         |
+
+## 3.3.1 — a pause between the two command words (added 2026-11-13)
+
+Field report (3.3.0, real voice, phone): with more than a short pause between "Punkt" and
+"Blau" nothing counts. Vosk's endpointer closes the utterance (the app sets no endpointer
+delays, so the model default of about 0.5 s applies) and each half arrives as its own
+result; besides, the grammar has no entry for a single command word, so a lone half is
+heard as a decoy or `[unk]`.
+
+### Joining halves
+
+- The grammar additionally holds every point word and every team word on its own (not the
+  alike variants, not undo), so a half can be heard as itself.
+- A *half* is a point word or a team word that is not part of an adjacent command. A
+  half followed by nothing but `[unk]` (noise, silence) is *remembered*. When the matching
+  other half follows (team after point, or point after team), again with nothing but
+  `[unk]` in between, the two count as one point command for that team — whether they are
+  in the same final result or in two consecutive ones. Both orders, the active
+  `CommandWords` (user words and the alike variants included).
+- Window: the pause between the halves, measured from the end of the first half to the
+  start of the second with Vosk's word timestamps (seconds of audio, the same clock for
+  both halves; independent of when the results arrive). Setting "Pause between words"
+  under the voice settings: 1 s, 2 s, 3 s; default 2 s. Persisted like the other voice
+  settings; a change restarts the recogniser (no app restart).
+- The remembered half is dropped when: any other word (not `[unk]`) comes in between; a
+  full command (or two) is recognised; the second half comes too late (shown as "pause
+  too long"); the echo guard ends (the recogniser is reset, as before); voice is
+  restarted or reconfigured. Undo is never a half. A second half of the same kind
+  replaces the remembered one ("punkt … punkt … blau" joins the last "punkt").
+- Rules per half as for a command: the in-speech rule counts the words before the
+  *first* half in its result (at most 4); the second half can have only `[unk]` before
+  it. Confidence of a joined command = the lower of the two halves' confidences, against
+  the same threshold (as for adjacent words, where the lowest command word decides).
+- Speed: a command said in one go is unchanged (early finalize, about 200 ms). While a
+  half is remembered, the early finalizer also ends the utterance as soon as the partial
+  result shows the matching half (after only `[unk]`), with the same 200 ms stability or
+  a following word, so the second half is acted on without waiting for Vosk's endpoint.
+  The window is checked on the final result (the partial has no timestamps).
+- Diagnostics: a remembered half shows as "punkt ‥" (waiting for the other word); a join
+  shows both halves with the pause, "punkt ‥ blau (1.4 s)", accepted, or rejected as
+  "pause too long" / low confidence.
