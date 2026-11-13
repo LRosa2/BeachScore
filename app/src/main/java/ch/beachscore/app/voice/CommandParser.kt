@@ -65,16 +65,20 @@ object CommandParser {
 
     /**
      * The closed grammar for the recogniser: every point word with every team word in both
-     * orders (except the [CommandWords.alike] variants), undo, the decoys and `[unk]`. Default words a user field replaced become decoys
-     * (heard as themselves rather than bent into the new words); the active words never are.
+     * orders (except the [CommandWords.alike] variants), undo, with [halves] (3.3.1) each of
+     * those point and team words on its own so that "punkt … blau" across a pause can be
+     * heard ([HalfJoiner]), the decoys and `[unk]`. Default words a user field replaced
+     * become decoys (heard as themselves rather than bent into the new words); the active
+     * words never are.
      */
-    fun grammar(words: CommandWords): List<String> {
+    fun grammar(words: CommandWords, halves: Boolean = true): List<String> {
         val commands = buildList {
             for (p in words.point - words.alike) for (t in words.blue + words.red) {
                 add("$p $t")
                 add("$t $p")
             }
             add(words.undo)
+            if (halves) addAll(words.point - words.alike + words.blue + words.red)
         }
         val active = words.all.toSet()
         val decoys = (DECOYS.getValue(words.language) + words.replaced).distinct().filter { it !in active }
@@ -86,8 +90,8 @@ object CommandParser {
     /** The decoy words of [language] with the default words (for tests). */
     fun decoys(language: Language): List<String> = DECOYS.getValue(language)
 
-    fun grammarJson(words: CommandWords): String =
-        grammar(words).joinToString(",", "[", "]") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }
+    fun grammarJson(words: CommandWords, halves: Boolean = true): String =
+        grammar(words, halves).joinToString(",", "[", "]") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }
 
     fun grammarJson(language: Language): String = grammarJson(CommandWords.defaults(language))
 

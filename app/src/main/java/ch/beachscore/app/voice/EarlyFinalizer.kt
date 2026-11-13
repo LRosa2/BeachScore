@@ -1,6 +1,5 @@
 package ch.beachscore.app.voice
 
-import ch.beachscore.app.input.ScoreCommand
 import ch.beachscore.app.score.Language
 
 /**
@@ -12,8 +11,17 @@ import ch.beachscore.app.score.Language
  * Undo waits longer than a point: a single word is often the start of an ordinary sentence
  * ("zurück zum Auto"), and the words after it make it an undo inside speech, which
  * [CommandParser] rejects.
+ *
+ * With a [joiner] (3.3.1), the second half of a command said with a pause ("Punkt … Blau")
+ * counts like a command here: once the partial shows it after the remembered half, or after
+ * a first half earlier in the same partial with only `[unk]` between, the utterance is ended
+ * the same way. The pause itself is checked on the final result, which has word times.
  */
-class EarlyFinalizer(private val words: CommandWords, private val sampleRate: Int = CommandRecognizer.SAMPLE_RATE) {
+class EarlyFinalizer(
+    private val words: CommandWords,
+    private val sampleRate: Int = CommandRecognizer.SAMPLE_RATE,
+    private val joiner: HalfJoiner? = null,
+) {
 
     constructor(language: Language) : this(CommandWords.defaults(language))
 
@@ -28,10 +36,12 @@ class EarlyFinalizer(private val words: CommandWords, private val sampleRate: In
         }
         val tokens = partial.lowercase().split(' ').filter { it.isNotEmpty() }
         val matches = CommandParser.find(tokens, words)
-        if (matches.isEmpty()) return false
+        val join = joiner?.completes(tokens)
+        if (matches.isEmpty() && join == null) return false
+        val end = maxOf(matches.maxOfOrNull { it.last } ?: -1, join ?: -1)
         // Something follows the command, or two different ones: waiting cannot change the outcome.
-        if (matches.maxOf { it.last } < tokens.size - 1 || matches.map { it.command }.distinct().size > 1) return true
-        val wait = if (matches.last().command == ScoreCommand.Undo) UNDO_STABLE_MS else POINT_STABLE_MS
+        if (end < tokens.size - 1 || matches.map { it.command }.distinct().size > 1) return true
+        val wait = if (tokens.last() == words.undo) UNDO_STABLE_MS else POINT_STABLE_MS
         return (samples - since) * 1000 >= wait.toLong() * sampleRate
     }
 

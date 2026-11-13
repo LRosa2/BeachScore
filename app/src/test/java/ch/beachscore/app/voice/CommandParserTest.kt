@@ -247,9 +247,20 @@ class CommandParserTest {
         assertEquals(listOf("punkt blau", "blau punkt", "punkt rot", "rot punkt", "zurück"), CommandParser.grammar(Language.DE).take(5))
         for (language in Language.entries) {
             assertEquals("[unk]", CommandParser.grammar(language).last())
-            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(5).dropLast(1))
+            assertEquals(CommandParser.decoys(language), CommandParser.grammar(language).drop(8).dropLast(1))
+            assertEquals(CommandParser.decoys(language), CommandParser.grammar(CommandWords.defaults(language), halves = false).drop(5).dropLast(1))
         }
-        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","zurück","der","""))
+        assert(CommandParser.grammarJson(Language.DE).startsWith("""["punkt blau","blau punkt","punkt rot","rot punkt","zurück","punkt","blau","rot","der","""))
+    }
+
+    @Test
+    fun `since 3_3_1 the grammar holds each point and team word on its own - so a half can be heard`() {
+        assertEquals(listOf("point", "blue", "red"), CommandParser.grammar(Language.EN).subList(5, 8))
+        val grammar = CommandParser.grammar(custom)
+        assertEquals(listOf("tor", "himmel", "azur", "feuer"), grammar.subList(7, 11))
+        // Not undo twice, not the alike variants.
+        assertEquals(1, CommandParser.grammar(Language.DE).count { it == "zurück" })
+        assertFalse("punk" in CommandParser.grammar(Language.DE))
     }
 
     @Test
@@ -317,12 +328,12 @@ class CommandParserTest {
     fun `grammar of a custom set - with its phrases and the replaced defaults as decoys`() {
         val grammar = CommandParser.grammar(custom)
         assertEquals(listOf("tor himmel", "himmel tor", "tor azur", "azur tor", "tor feuer", "feuer tor", "zurück"), grammar.take(7))
-        val decoys = grammar.drop(7).dropLast(1)
+        val decoys = grammar.drop(11).dropLast(1)
         assertTrue("punkt" in decoys && "punk" in decoys && "blau" in decoys && "rot" in decoys)
         assertFalse("tor" in decoys || "himmel" in decoys || "feuer" in decoys)
         // "netz" is a default decoy; as a command word it leaves the decoys.
         val net = CommandParser.grammar(CommandWords.of(Language.DE, CustomWords(blue = listOf("netz"))))
-        assertFalse("netz" in net)
+        assertEquals(1, net.count { it == "netz" }) // the half, not a decoy as well
         assertTrue("netz punkt" in net)
         assertEquals(decoys.size, decoys.toSet().size)
         assertEquals("[unk]", grammar.last())

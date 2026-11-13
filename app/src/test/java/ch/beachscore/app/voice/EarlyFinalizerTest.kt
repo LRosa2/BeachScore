@@ -78,6 +78,45 @@ class EarlyFinalizerTest {
         assertEquals(200, firstFinalise(f, "blau tor", "blau tor [unk]"))
     }
 
+    private fun joined(language: Language = Language.DE): Pair<EarlyFinalizer, HalfJoiner> {
+        val words = CommandWords.defaults(language)
+        val joiner = HalfJoiner(words, 2000, VoiceSensitivity.NORMAL.minConfidence)
+        return EarlyFinalizer(words, joiner = joiner) to joiner
+    }
+
+    private fun remember(joiner: HalfJoiner, word: String) {
+        val r = VoskResult(word, listOf(VoskResult.Word(word, 1.0, 0.0, 0.4)))
+        joiner.join(r, Heard(word, 1.0, Verdict.Rejected(RejectReason.UNKNOWN)))
+    }
+
+    @Test
+    fun `with a remembered half the matching half is finalised like a command`() {
+        val (f, joiner) = joined()
+        remember(joiner, "punkt")
+        // Stable for 200 ms after it first shows.
+        assertEquals(200 + EarlyFinalizer.POINT_STABLE_MS, firstFinalise(f, "[unk]", "[unk] blau", "[unk] blau", "[unk] blau", "[unk] blau"))
+        f.reset()
+        // Followed by anything: at once.
+        assertEquals(200, firstFinalise(f, "rot", "rot [unk]"))
+        f.reset()
+        // The same kind of half, or talk before it, is not a join.
+        assertEquals(null, firstFinalise(f, "punkt", "punkt", "punkt", "punkt"))
+        f.reset()
+        assertEquals(null, firstFinalise(f, "ja blau", "ja blau", "ja blau", "ja blau"))
+    }
+
+    @Test
+    fun `two halves with noise between in one partial are finalised`() {
+        val (f, _) = joined(Language.EN)
+        assertEquals(300 + EarlyFinalizer.POINT_STABLE_MS, firstFinalise(f, "point", "point [unk]", "point [unk] blue", "point [unk] blue", "point [unk] blue", "point [unk] blue"))
+    }
+
+    @Test
+    fun `without a half nothing changes for a lone team word`() {
+        val (f, _) = joined()
+        assertEquals(null, firstFinalise(f, "blau", "blau", "blau", "blau", "blau [unk]"))
+    }
+
     @Test
     fun `the partial result json is read`() {
         assertEquals("punkt blau", VoskResult.parsePartial("{\n  \"partial\" : \"punkt blau\"\n}"))

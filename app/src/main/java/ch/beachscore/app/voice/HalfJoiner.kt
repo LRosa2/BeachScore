@@ -113,8 +113,12 @@ class HalfJoiner(
         else -> null
     }
 
-    private companion object {
+    companion object {
+        /** "Pause between words" setting: the choices and the default. */
+        val PAUSE_CHOICES_MS = listOf(1000L, 2000L, 3000L)
+        const val DEFAULT_PAUSE_MS = 2000L
+
         /** Vosk times are printed with a few decimals; 2.0 s may come out as 2.0000001. */
-        const val EPSILON_MS = 1.0
+        private const val EPSILON_MS = 1.0
     }
 }
