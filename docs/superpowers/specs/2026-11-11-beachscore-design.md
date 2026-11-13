@@ -562,6 +562,13 @@ heard as a decoy or `[unk]`.
   *first* half in its result (at most 4); the second half can have only `[unk]` before
   it. Confidence of a joined command = the lower of the two halves' confidences, against
   the same threshold (as for adjacent words, where the lowest command word decides).
+- Endpointer: the recogniser sets Vosk's endpointer delays so that it waits as long as the
+  pause setting for trailing silence (`setEndpointerDelays(5, pause, 20)`; Vosk default
+  0.5 s). "Punkt … Blau" then usually stays one utterance and the decoder hears the phrase
+  with its context (a lone German "Rot" is often heard as the decoy "Brot"). The two
+  words are then adjacent in one result; the window still applies, using the word times
+  ("pause too long" as for a join). The join across results covers what the endpointer
+  splits (longer pauses, noise). Chosen by measurement, see below.
 - Speed: a command said in one go is unchanged (early finalize, about 200 ms). While a
   half is remembered, the early finalizer also ends the utterance as soon as the partial
   result shows the matching half (after only `[unk]`), with the same 200 ms stability or

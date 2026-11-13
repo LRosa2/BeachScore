@@ -216,7 +216,7 @@ class VoiceSpottingTest {
         for ((label, words) in listOf<Pair<String, (Language) -> CommandWords>>("3.2.0" to ::baseline, "3.3.0" to CommandWords::defaults)) {
             var hits = 0
             for (condition in CONDITIONS) for (clip in commands) {
-                val run = run(words(clip.language), place(clip, condition).first, VoiceSensitivity.NORMAL)
+                val run = run(words(clip.language), place(clip, condition).first, VoiceSensitivity.NORMAL, maxPauseMs = null)
                 if (run.accepted == listOf(clip.expected)) hits++ else line("paired-$label\tmiss\t$condition\t${clip.name}\t${describe(run.heard)}")
             }
             val chatter = mutableListOf<String>()
@@ -225,7 +225,7 @@ class VoiceSpottingTest {
                 var count = 0
                 for (stream in chatterStreams) for (bed in listOf(false, true)) {
                     val pcm = if (bed) withBed(stream.pcm, stream.language, stream.name.hashCode().toLong()) else stream.pcm
-                    val run = run(words(stream.language), pcm + ShortArray(RATE), sensitivity)
+                    val run = run(words(stream.language), pcm + ShortArray(RATE), sensitivity, maxPauseMs = null)
                     if (run.accepted.isNotEmpty()) {
                         count++
                         line("paired-$label	$sensitivity	${stream.name}	$bed	TRIGGER ${run.accepted}	${describe(run.heard)}")
@@ -246,6 +246,144 @@ class VoiceSpottingTest {
         assertTrue(message, newRelaxed <= oldRelaxed + MAX_EXTRA_TRIGGERS_VS_320)
     }
 
+    /**
+     * 3.3.1: "Punkt … Blau" with a pause. Each half synthesised on its own, placed with about
+     * 0.7 s, 1.5 s and 2.5 s of silence between them (both orders, both languages, three
+     * voices), in quiet and under the continuous noise bed; recognised at each setting.
+     * At 2 s a 2.5 s pause must not score; at 3 s it should.
+     */
+    @Test
+    fun commandsWithAPauseBetweenTheWords() {
+        val summary = mutableListOf<String>()
+        val wrong = mutableListOf<String>()
+        // Under the bed, background chatter full of command words can fill the pause
+        // ("point" + a background "red"): reported, not a gate.
+        val bedWrong = mutableListOf<String>()
+        val hits = mutableMapOf<Pair<Long, Int>, Int>() // (setting, pause) to hits
+        val totals = mutableMapOf<Int, Int>()
+        val latencies = mutableMapOf<Long, MutableList<Int>>()
+        for (setting in HalfJoiner.PAUSE_CHOICES_MS) for (clip in pausedCommands) for (bed in listOf(false, true)) {
+            val pcm = if (bed) withBed(clip.pcm, clip.language, clip.name.hashCode().toLong()) else clip.pcm
+            val run = run(CommandWords.defaults(clip.language), pcm, VoiceSensitivity.NORMAL, setting)
+            val hit = run.accepted == listOf(clip.command.expected)
+            if (setting == HalfJoiner.DEFAULT_PAUSE_MS) totals.merge(clip.pauseMs, 1, Int::plus)
+            if (hit) {
+                hits.merge(setting to clip.pauseMs, 1, Int::plus)
+                latencies.getOrPut(setting) { mutableListOf() } += (run.acceptedAt.first() - clip.end) * 1000 / RATE
+            }
+            if (run.accepted.any { it != clip.command.expected }) (if (bed) bedWrong else wrong) += "$setting ${clip.command.name} bed=$bed: ${describe(run.heard)}"
+            line("paused-$setting\t${clip.command.name}\t${if (bed) "bed" else "quiet"}\t${if (hit) "HIT" else "miss"}\t${describe(run.heard)}")
+        }
+        for (setting in HalfJoiner.PAUSE_CHOICES_MS) {
+            val perPause = PAUSES_MS.joinToString(", ") { "${it / 1000.0} s: ${hits[setting to it] ?: 0} of ${totals[it]}" }
+            summary += "pause setting ${setting / 1000} s: $perPause; second word end -> accepted ${stats(latencies[setting].orEmpty())}"
+        }
+        summary += "paused commands, wrong: ${wrong.size} in quiet, ${bedWrong.size} under the noise bed"
+        summary.forEach { line("# $it") }
+        (wrong + bedWrong).forEach { line("WRONG paused $it") }
+        val message = summary.joinToString("\n") + "\n" + wrong.joinToString("\n")
+        assertTrue(message, wrong.isEmpty())
+        assertTrue(message, (hits[HalfJoiner.DEFAULT_PAUSE_MS to 2500] ?: 0) == 0)
+        assertTrue(message, (hits[3000L to 2500] ?: 0) >= totals.getValue(2500) / 2)
+        assertTrue(message, (hits[HalfJoiner.DEFAULT_PAUSE_MS to 1500] ?: 0) >= totals.getValue(1500) / 2)
+    }
+
+    /**
+     * 3.3.1 against the 3.3.0 recogniser (no single words in the grammar, no joining) on the
+     * same audio: commands said in one go, and chatter at each pause setting.
+     */
+    @Test
+    fun sameAudioWithThe330Recogniser() {
+        val summary = mutableListOf<String>()
+        val results = mutableMapOf<Long?, Triple<Int, Int, Int>>()
+        for (setting in listOf<Long?>(null) + HalfJoiner.PAUSE_CHOICES_MS) {
+            val label = setting?.let { "3.3.1 ${it / 1000} s" } ?: "3.3.0"
+            var hits = 0
+            var wrong = 0
+            val latencies = mutableListOf<Int>()
+            for (condition in CONDITIONS) for (clip in commands) {
+                val (pcm, end) = place(clip, condition)
+                val run = run(CommandWords.defaults(clip.language), pcm, VoiceSensitivity.NORMAL, setting)
+                if (run.accepted == listOf(clip.expected)) {
+                    hits++
+                    latencies += (run.acceptedAt.first() - end) * 1000 / RATE
+                } else {
+                    line("paired330-$label\tmiss\t$condition\t${clip.name}\t${describe(run.heard)}")
+                }
+                if (run.accepted.any { it != clip.expected }) wrong++
+            }
+            val counts = mutableListOf<Int>()
+            for (sensitivity in listOf(VoiceSensitivity.NORMAL, VoiceSensitivity.RELAXED)) {
+                var count = 0
+                for (stream in chatterStreams) for (bed in listOf(false, true)) {
+                    val pcm = if (bed) withBed(stream.pcm, stream.language, stream.name.hashCode().toLong()) else stream.pcm
+                    val run = run(CommandWords.defaults(stream.language), pcm + ShortArray(RATE), sensitivity, setting)
+                    if (run.accepted.isNotEmpty()) {
+                        count++
+                        line("paired330-$label\t$sensitivity\t${stream.name}\t$bed\tTRIGGER ${run.accepted}\t${describe(run.heard)}")
+                    }
+                }
+                counts += count
+            }
+            summary += "same audio, $label: $hits of ${commands.size * CONDITIONS.size} commands in one go (latency ${stats(latencies)}), " +
+                "wrong $wrong; chatter ${counts[0]} at NORMAL, ${counts[1]} at RELAXED (of ${chatterStreams.size * 2})"
+            results[setting] = Triple(hits, counts[0], counts[1])
+            assertTrue("wrong commands with $label", wrong == 0)
+        }
+        summary.forEach { line("# $it") }
+        val (oldHits, oldNormal, oldRelaxed) = results.getValue(null)
+        val (newHits, newNormal, newRelaxed) = results.getValue(HalfJoiner.DEFAULT_PAUSE_MS)
+        val message = summary.joinToString("\n")
+        assertTrue(message, newHits >= oldHits - MAX_FEWER_COMMANDS_VS_330)
+        assertTrue(message, newNormal <= oldNormal + MAX_EXTRA_TRIGGERS_VS_330 && newRelaxed <= oldRelaxed + MAX_EXTRA_TRIGGERS_VS_330)
+    }
+
+    /**
+     * Option (brief item 6): Vosk's endpointer waits the pause setting instead of 0.5 s, so
+     * "punkt … blau" can stay one utterance and be heard as the phrase. Measured against the
+     * production recogniser on the same audio.
+     */
+    @Test
+    fun pauseWithALongerEndpointer() {
+        val summary = mutableListOf<String>()
+        for (long in listOf(false, true)) {
+            val label = if (long) "long endpointer" else "default endpointer"
+            for (setting in listOf(2000L, 3000L)) {
+                val hits = mutableMapOf<Int, Int>()
+                var wrong = 0
+                for (clip in pausedCommands) for (bed in listOf(false, true)) {
+                    val pcm = if (bed) withBed(clip.pcm, clip.language, clip.name.hashCode().toLong()) else clip.pcm
+                    val run = run(CommandWords.defaults(clip.language), pcm, VoiceSensitivity.NORMAL, setting, long)
+                    val hit = run.accepted == listOf(clip.command.expected)
+                    if (hit) hits.merge(clip.pauseMs, 1, Int::plus)
+                    if (run.accepted.any { it != clip.command.expected }) wrong++
+                    line("endpointer-$long-$setting	${clip.command.name}	${if (bed) "bed" else "quiet"}	${if (hit) "HIT" else "miss"}	${describe(run.heard)}")
+                }
+                summary += "$label, pause setting ${setting / 1000} s: " + PAUSES_MS.joinToString(", ") { "${it / 1000.0} s: ${hits[it] ?: 0} of ${pausedCommands.count { c -> c.pauseMs == it } * 2}" } + ", wrong $wrong"
+            }
+            var oneGo = 0
+            for (condition in CONDITIONS) for (clip in commands) {
+                val run = run(CommandWords.defaults(clip.language), place(clip, condition).first, VoiceSensitivity.NORMAL, 2000L, long)
+                if (run.accepted == listOf(clip.expected)) oneGo++ else line("endpointer-$long-onego	miss	$condition	${clip.name}	${describe(run.heard)}")
+            }
+            val counts = mutableListOf<Int>()
+            for (sensitivity in listOf(VoiceSensitivity.NORMAL, VoiceSensitivity.RELAXED)) {
+                var count = 0
+                for (stream in chatterStreams) for (bed in listOf(false, true)) {
+                    val pcm = if (bed) withBed(stream.pcm, stream.language, stream.name.hashCode().toLong()) else stream.pcm
+                    val run = run(CommandWords.defaults(stream.language), pcm + ShortArray(RATE * 3), sensitivity, 2000L, long)
+                    if (run.accepted.isNotEmpty()) {
+                        count++
+                        line("endpointer-$long-chatter	$sensitivity	${stream.name}	$bed	TRIGGER ${run.accepted}	${describe(run.heard)}")
+                    }
+                }
+                counts += count
+            }
+            summary += "$label at 2 s: one go $oneGo of ${commands.size * CONDITIONS.size}; chatter ${counts[0]} NORMAL, ${counts[1]} RELAXED"
+        }
+        summary.forEach { line("# $it") }
+    }
+
     @Test
     fun theModelVocabularyIsReadable() {
         val de = models.getValue(Language.DE)
@@ -260,11 +398,17 @@ class VoiceSpottingTest {
     private fun run(language: Language, pcm: ShortArray, sensitivity: VoiceSensitivity): Run =
         run(CommandWords.defaults(language), pcm, sensitivity)
 
-    private fun run(words: CommandWords, pcm: ShortArray, sensitivity: VoiceSensitivity): Run {
+    private fun run(
+        words: CommandWords,
+        pcm: ShortArray,
+        sensitivity: VoiceSensitivity,
+        maxPauseMs: Long? = HalfJoiner.DEFAULT_PAUSE_MS,
+        longEndpointer: Boolean = true,
+    ): Run {
         val accepted = mutableListOf<ScoreCommand>()
         val heard = mutableListOf<Heard>()
         val at = mutableListOf<Int>()
-        CommandRecognizer(models.getValue(words.language), words, sensitivity.minConfidence).use { rec ->
+        CommandRecognizer(models.getValue(words.language), words, sensitivity.minConfidence, maxPauseMs = maxPauseMs, longEndpointer = longEndpointer).use { rec ->
             val chunk = RATE / 10
             var i = 0
             fun take(h: Heard?, pos: Int) {
@@ -334,6 +478,15 @@ class VoiceSpottingTest {
          */
         private const val MAX_FEWER_COMMANDS_VS_320 = 1
 
+        /**
+         * 3.3.1 against 3.3.0 on the same audio: the single command words in the grammar take a
+         * little confidence from a few weak pairs (first run: 140 against 142, e.g. "punkt:0.65
+         * blau" after "schöner Aufschlag"); chatter at the default 2 s with the longer
+         * endpointer was 4 against 4.
+         */
+        private const val MAX_FEWER_COMMANDS_VS_330 = 2
+        private const val MAX_EXTRA_TRIGGERS_VS_330 = 1
+
         /** Target speech level after normalising (about -21 dBFS). */
         private const val SPEECH_RMS = 3000.0
 
@@ -356,6 +509,19 @@ class VoiceSpottingTest {
             Language.EN to ("point_blue" to "points blue"), Language.EN to ("point_red" to "red points"),
         )
         private val chatterStreams = mutableListOf<Clip>()
+
+        /** 3.3.1: the halves on their own, per language and voice: "point", "blue", "red". */
+        private val DE_HALVES = listOf("point" to "Punkt", "blue" to "Blau", "red" to "Rot")
+        private val EN_HALVES = listOf("point" to "point", "blue" to "blue", "red" to "red")
+        private val PAUSES_MS = listOf(700, 1500, 2500)
+
+        /** A command said with [pauseMs] of silence between its words; [end]: end of the second word. */
+        private class Paused(val command: Clip, val pauseMs: Int, val end: Int) {
+            val pcm get() = command.pcm
+            val name get() = command.name
+            val language get() = command.language
+        }
+        private val pausedCommands = mutableListOf<Paused>()
         private val neutral = mutableMapOf<Language, List<ShortArray>>()
         private val babble = mutableMapOf<Language, ShortArray>()
         private val report = mutableListOf<String>()
@@ -419,6 +585,8 @@ class VoiceSpottingTest {
             CUSTOM_COMMANDS.forEach { texts += Triple(Language.DE, "custom:" + it.first, it.second) }
             VARIANT_COMMANDS.forEach { (language, c) -> texts += Triple(language, "variant:" + c.first, c.second) }
             EN_COMMANDS.forEach { texts += Triple(Language.EN, "cmd:" + it.first, it.second) }
+            DE_HALVES.forEach { texts += Triple(Language.DE, "half:" + it.first, it.second) }
+            EN_HALVES.forEach { texts += Triple(Language.EN, "half:" + it.first, it.second) }
             DE_NEUTRAL.forEach { texts += Triple(Language.DE, "neutral", it) }
             EN_NEUTRAL.forEach { texts += Triple(Language.EN, "neutral", it) }
             (DE_CHATTER + DE_UNDO_CHATTER).forEach { texts += Triple(Language.DE, "chatter", it) }
@@ -426,12 +594,14 @@ class VoiceSpottingTest {
 
             val neutralClips = mutableMapOf<Language, MutableList<ShortArray>>()
             val chatterClips = mutableMapOf<Language, MutableList<Pair<String, ShortArray>>>()
+            val halves = mutableMapOf<Triple<Language, Int, String>, ShortArray>()
             for ((v, variant) in VARIANTS.withIndex()) {
                 for ((key, pcm, text) in synthesize(target, texts, variant)) {
                     val (language, kind) = key
                     val clip = normalise(trim(pcm))
                     val slug = text.lowercase().replace(Regex("[^a-zäöüß]+"), "_").trim('_')
                     when {
+                        kind.startsWith("half:") -> halves[Triple(language, v, kind.removePrefix("half:"))] = clip
                         kind.startsWith("variant:") ->
                             variantCommands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("variant:")), clip)
                         kind.startsWith("custom:") ->
@@ -455,6 +625,21 @@ class VoiceSpottingTest {
                 }
             }
             neutralClips.forEach { (language, clips) -> neutral[language] = clips }
+
+            // Paused commands: half, silence, other half; both orders.
+            for ((language, v, kind) in halves.keys.filter { it.third != "point" }) {
+                val point = halves[Triple(language, v, "point")] ?: continue
+                val team = halves.getValue(Triple(language, v, kind))
+                for (pointFirst in listOf(true, false)) for (pauseMs in PAUSES_MS) {
+                    val (a, b) = if (pointFirst) point to team else team to point
+                    val lead = ShortArray(RATE / 2)
+                    val gap = ShortArray(RATE * pauseMs / 1000)
+                    val pcm = lead + a + gap + b + ShortArray(RATE * 3 / 2)
+                    val order = if (pointFirst) "point_$kind" else "${kind}_point"
+                    val clip = Clip("${language.tag}__tts${v}__${order}__${pauseMs}ms", language, command("point_$kind"), pcm)
+                    pausedCommands += Paused(clip, pauseMs, lead.size + a.size + gap.size + b.size)
+                }
+            }
 
             // Chatter streams: each sentence of each voice variant, followed directly by two more.
             for ((language, clips) in chatterClips) {
@@ -534,7 +719,7 @@ class VoiceSpottingTest {
         }
 
         private fun describe(heard: List<Heard>) =
-            heard.joinToString(" | ") { "\"${it.text}\" min=${"%.2f".format(Locale.ROOT, it.minConfidence ?: -1.0)} ${it.verdict}" }
+            heard.joinToString(" | ") { "\"${it.text}\"" + (if ('‥' in it.display) " [${it.display}]" else "") + " min=${"%.2f".format(Locale.ROOT, it.minConfidence ?: -1.0)} ${it.verdict}" }
 
         private fun synthesize(
             context: Context,
