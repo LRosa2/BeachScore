@@ -43,11 +43,11 @@ class HalfJoiner(
     fun join(result: VoskResult, parsed: Heard?): Heard? {
         parsed ?: return null // silence: keep waiting
         val tokens = result.text.lowercase().split(' ').filter { it.isNotEmpty() }
-        if (CommandParser.find(tokens, words).isNotEmpty() || result.words.size != tokens.size ||
-            result.words.any { it.start == null || it.end == null }
-        ) {
+        val matches = CommandParser.find(tokens, words)
+        val timed = result.words.size == tokens.size && result.words.all { it.start != null && it.end != null }
+        if (matches.isNotEmpty() || !timed) {
             pending = null
-            return parsed
+            return if (timed) withPause(result, parsed, matches) else parsed
         }
         var current = pending
         var talk = 0
@@ -85,6 +85,24 @@ class HalfJoiner(
     }
 
     /**
+     * An accepted point whose two words are adjacent in the result but with a pause between
+     * them (one utterance, e.g. under a longer endpointer): the window applies as for a join,
+     * and a noticeable pause is shown like one.
+     */
+    private fun withPause(result: VoskResult, parsed: Heard, matches: List<CommandParser.Match>): Heard {
+        val command = (parsed.verdict as? Verdict.Accepted)?.command as? ScoreCommand.TeamPoint ?: return parsed
+        val best = matches.filter { it.command == command }.minByOrNull { gap(result, it) } ?: return parsed
+        val pause = gap(result, best)
+        if (pause * 1000 < SHOW_PAUSE_MS) return parsed
+        val display = "${result.words[best.first].word} ‥ ${result.words[best.last].word} (${String.format(Locale.ROOT, "%.1f", pause)} s)"
+        val verdict = if (pause * 1000 > maxPauseMs + EPSILON_MS) Verdict.Rejected(RejectReason.PAUSE_TOO_LONG) else parsed.verdict
+        return parsed.copy(verdict = verdict, display = display)
+    }
+
+    private fun gap(result: VoskResult, match: CommandParser.Match) =
+        result.words[match.last].start!! - result.words[match.first].end!!
+
+    /**
      * For the early finalizer, on a partial result without timestamps: the index of the token
      * that completes a join with [pending] or with a half earlier in [tokens], or null.
      */
@@ -120,5 +138,8 @@ class HalfJoiner(
 
         /** Vosk times are printed with a few decimals; 2.0 s may come out as 2.0000001. */
         private const val EPSILON_MS = 1.0
+
+        /** Adjacent command words further apart than this are shown with their pause. */
+        private const val SHOW_PAUSE_MS = 500.0
     }
 }

@@ -74,6 +74,22 @@ class HalfJoinerTest {
     }
 
     @Test
+    fun `adjacent command words with a long silence between them obey the window too`() {
+        // With a longer endpointer both halves can arrive in one result, adjacent.
+        val r = rig(maxPauseMs = 2000)
+        val late = r.hear(result(W("punkt", 0.0, end = 0.4), W("blau", 2.9)))
+        assertEquals(RejectReason.PAUSE_TOO_LONG, reason(late))
+        assertEquals("punkt ‥ blau (2.5 s)", late!!.display)
+        val inTime = r.hear(result(W("blau", 10.0, end = 10.4), W("punkt", 11.9)))
+        assertEquals(blue, command(inTime))
+        assertEquals("blau ‥ punkt (1.5 s)", inTime!!.display)
+        // Said in one go: unchanged.
+        val normal = r.hear(result(W("[unk]", 20.0), W("punkt", 20.5, end = 20.9), W("rot", 20.9)))
+        assertEquals(red, command(normal))
+        assertEquals("… punkt rot", normal!!.display)
+    }
+
+    @Test
     fun `a late second half is remembered in turn`() {
         val r = rig(maxPauseMs = 1000)
         r.hear(result(W("blau", 0.0)))

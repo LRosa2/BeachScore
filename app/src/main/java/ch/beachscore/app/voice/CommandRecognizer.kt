@@ -16,6 +16,13 @@ class CommandRecognizer(
     sampleRate: Float = SAMPLE_RATE.toFloat(),
     /** Longest pause between the two words of a point command; null: no joining (3.3.0). */
     maxPauseMs: Long? = HalfJoiner.DEFAULT_PAUSE_MS,
+    /**
+     * Vosk's endpointer waits [maxPauseMs] of silence instead of its default 0.5 s, so
+     * "punkt … blau" usually stays one utterance and is heard as the phrase; [HalfJoiner]
+     * covers the rest. Measured (VoiceSpottingTest.pauseWithALongerEndpointer): paused
+     * commands 34/31 of 48 instead of 23/22 at 0.7/1.5 s, chatter 4 instead of 6.
+     */
+    longEndpointer: Boolean = true,
 ) : AutoCloseable {
 
     constructor(model: Model, language: Language, minConfidence: Double, sampleRate: Float = SAMPLE_RATE.toFloat()) :
@@ -23,6 +30,7 @@ class CommandRecognizer(
 
     private val recognizer = Recognizer(model, sampleRate, CommandParser.grammarJson(words, halves = maxPauseMs != null)).apply {
         setWords(true)
+        if (longEndpointer && maxPauseMs != null) setEndpointerDelays(5f, maxPauseMs / 1000f, 20f)
     }
 
     private val joiner = maxPauseMs?.let { HalfJoiner(words, it, minConfidence) }
