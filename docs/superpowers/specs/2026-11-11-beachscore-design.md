@@ -577,3 +577,38 @@ heard as a decoy or `[unk]`.
 - Diagnostics: a remembered half shows as "punkt ‥" (waiting for the other word); a join
   shows both halves with the pause, "punkt ‥ blau (1.4 s)", accepted, or rejected as
   "pause too long" / low confidence.
+
+### Measurements 3.3.1 (VoiceSpottingTest, emulator)
+
+Paused commands: each half synthesised alone (3 voices × DE/EN × Blue/Red × both orders =
+24 clips per pause), silence of about 0.7 / 1.5 / 2.5 s between, in quiet and under the
+continuous noise bed (48 per pause):
+
+| recognised (of 48)               | 0.7 s | 1.5 s | 2.5 s | second word end → accepted |
+|----------------------------------|-------|-------|-------|----------------------------|
+| setting 1 s                      | 34    | 1     | 0     | median 250 ms, max 590 ms  |
+| setting 2 s (default)            | 34    | 32    | 0     | median 230 ms, max 590 ms  |
+| setting 3 s                      | 34    | 31    | 36    | median 230 ms, max 590 ms  |
+| 2 s, Vosk's default endpointer   | 22–23 | 21–22 | 0     |                            |
+
+English in quiet: 24 of 24 at 0.7 s and 1.5 s. The misses are German (a lone synthetic
+"Rot" is heard as "Brot", low confidence on single "Punkt") and the noise bed, whose
+background words fill the pause and break the join. Wrong commands: none in quiet; under
+the bed one clip at each setting ("point … blue" with a background "red" right after
+"point").
+
+Same audio as 3.3.0 (commands in one go, 184; chatter, 144):
+
+|                        | 3.3.0 | 3.3.1 1 s | 3.3.1 2 s | 3.3.1 3 s |
+|------------------------|-------|-----------|-----------|-----------|
+| commands in one go     | 141   | 141       | 139       | 140       |
+| chatter Normal         | 4     | 2         | 4         | 5         |
+| chatter Relaxed        | 4     | 4         | 4         | 5         |
+| wrong command          | 0     | 0         | 0         | 0         |
+
+A second run gave 140 vs 142 (one go) and chatter 4/4 at 2 s with the long endpointer.
+The one-go loss (1–2 of 184) is the single words in the grammar taking a little
+confidence from weak pairs ("punkt:0.65 blau" after "schöner Aufschlag"). Latency of
+one-go commands unchanged (median 240 ms). Chatter cost of joining: a sentence ending in
+the point word followed by one starting with a team word ("… a great point. Red serves")
+can join.

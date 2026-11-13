@@ -62,11 +62,12 @@ class PauseSettingTest {
         rule.onNodeWithTag("pause_3").assertIsSelected()
     }
 
+    /** Compose tests render in the device locale; the German labels are checked on screenshots. */
     @Test
-    fun germanLabels() {
+    fun aStoredValueIsShownSelectedAndPassedOn() {
         show(FakeSettingsStore(Settings(voiceCommands = true, language = Language.DE, voicePauseMs = 1000L)))
+        rule.waitUntil(5_000) { voice.maxPauseMs == 1000L }
         rule.onNodeWithTag("menu").performClick()
-        rule.onNodeWithText("Pause zwischen den Wörtern", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("pause_1").performScrollTo().assertIsSelected()
     }
 }
