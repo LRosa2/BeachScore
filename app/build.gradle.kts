@@ -1,6 +1,7 @@
 import java.net.URI
 import java.security.MessageDigest
 import java.time.LocalDate
+import java.util.Properties
 import java.util.zip.ZipInputStream
 
 plugins {
@@ -9,6 +10,15 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
+
+// Release signing: one self-generated key for every channel. The keystore and its passwords live
+// OUTSIDE the repo; keystore.properties (git-ignored) points at them. Without that file, release
+// builds are simply unsigned.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
 
 android {
     namespace = "ch.beachscore.app"
@@ -33,9 +43,21 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
         }
     }
 
