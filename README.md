@@ -56,6 +56,10 @@ Then build the signed app:
 
 Without that file, release builds are unsigned.
 
+## Licence
+
+BeachScore is released under the [MIT License](LICENSE).
+
 ## Third-party parts
 
 - [Vosk](https://alphacephei.com/vosk/) speech recognition and its small German and English
