@@ -46,8 +46,9 @@ fun RemoteSection(
         for (action in RemoteAction.entries) {
             val tag = action.tag
             val keys = settings.remoteKeys.keysFor(action)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) {
+            // Label and buttons on their own lines: the panel is narrow in landscape.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column {
                     Text(stringResource(actionText(action)), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                     val detail = when {
                         learning == action -> stringResource(R.string.remote_press_a_button)
@@ -61,6 +62,7 @@ fun RemoteSection(
                         modifier = Modifier.testTag("remote_keys_$tag"),
                     )
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (learning == action) {
                     OutlinedButton(onClick = onCancelLearn, modifier = Modifier.testTag("remote_cancel_$tag")) { Text(stringResource(R.string.cancel)) }
                 } else {
@@ -68,6 +70,7 @@ fun RemoteSection(
                 }
                 TextButton(onClick = { onClear(action) }, enabled = keys.isNotEmpty(), modifier = Modifier.testTag("remote_clear_$tag")) {
                     Text(stringResource(R.string.remote_clear))
+                }
                 }
             }
         }
