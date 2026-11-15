@@ -85,6 +85,8 @@ announcement is audible outdoors.
 
 ### Hardware key input
 
+(Replaced in 3.4.0 by "Remote buttons", see below.)
+
 - Volume-up adds a point for the team shown on the **left**, volume-down for the team on
   the **right** (this is what cheap Bluetooth shutter remotes and media clickers send).
   Key repeat is ignored; the tap lock applies.

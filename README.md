@@ -2,7 +2,7 @@
 
 A beach volleyball scoreboard for Android. The phone lies next to the court in landscape, shows the
 score in two big halves and speaks it after every point. Points are counted by tapping a half, with
-the volume keys, or by voice ("Blau Punkt", "point red") — offline, in German and English.
+the buttons of a Bluetooth remote, or by voice ("Blau Punkt", "point red") — offline, in German and English.
 
 The full design is in
 [`docs/superpowers/specs/2026-11-11-beachscore-design.md`](docs/superpowers/specs/2026-11-11-beachscore-design.md).
@@ -12,6 +12,8 @@ The full design is in
 - Two-half scoreboard, always on. A tap lock stops double counts.
 - Speaks the score after each point; can be switched off.
 - Sets to 15 or 21, win by two.
+- Remote buttons: learn any button of a Bluetooth media remote (or keyboard) for Blue point,
+  Red point and Undo.
 - Offline voice commands with configurable words, also inside longer speech and with a pause
   between the two words.
 - Microphone choice: automatic, phone, or USB / wired.
