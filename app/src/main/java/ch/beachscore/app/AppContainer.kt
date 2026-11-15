@@ -13,7 +13,7 @@ import ch.beachscore.app.data.MatchRepository
 import ch.beachscore.app.data.PlayerRepository
 import ch.beachscore.app.data.db.HistoryDatabase
 import ch.beachscore.app.data.SettingsRepository
-import ch.beachscore.app.input.HardwareKeyInput
+import ch.beachscore.app.input.RemoteKeyInput
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.speech.TtsSpeaker
 import ch.beachscore.app.ui.ScoreboardViewModel
@@ -53,7 +53,7 @@ class AppContainer(context: Context) {
 
     val speaker by lazy { TtsSpeaker(app, echoGuard) }
 
-    val hardwareKeys = HardwareKeyInput()
+    val remoteKeys = RemoteKeyInput()
 
     val voiceInput by lazy { VoiceInput(app, ModelStore(app), echoGuard, appScope) }
 
@@ -68,7 +68,7 @@ class AppContainer(context: Context) {
                 settingsStore = settingsRepository,
                 speaker = speaker,
                 clock = SystemClock::elapsedRealtime,
-                hardwareKeys = hardwareKeys,
+                remoteKeys = remoteKeys,
                 voice = voiceInput,
                 history = historyRepository,
                 players = playerRepository,

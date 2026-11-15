@@ -9,17 +9,17 @@ import kotlinx.coroutines.flow.asSharedFlow
 enum class Side { LEFT, RIGHT }
 
 sealed interface ScoreCommand {
-    /** A point for the team shown on [side] (touch, hardware keys). */
+    /** A point for the team shown on [side] (touch). */
     data class Point(val side: Side) : ScoreCommand
 
-    /** A point for a named team (voice), independent of Swap sides. */
+    /** A point for a named team (voice, remote buttons), independent of Swap sides. */
     data class TeamPoint(val team: Team) : ScoreCommand
 
     data object Undo : ScoreCommand
 }
 
 /**
- * A source of scoring commands. Phase 1: [TouchInput] and [HardwareKeyInput]. Phase 2 adds a
+ * A source of scoring commands. [TouchInput], [RemoteKeyInput] and (phase 2) a
  * voice input implementing this interface; every source goes through the same tap lock.
  */
 interface ScoreInput {

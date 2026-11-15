@@ -6,7 +6,8 @@ import ch.beachscore.app.data.Settings
 import ch.beachscore.app.fakes.FakeMatchStore
 import ch.beachscore.app.fakes.FakeSettingsStore
 import ch.beachscore.app.fakes.FakeSpeaker
-import ch.beachscore.app.input.HardwareKeyInput
+import ch.beachscore.app.input.RemoteKeyInput
+import ch.beachscore.app.input.RemoteKeys
 import ch.beachscore.app.input.Side
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
@@ -36,7 +37,7 @@ class ScoreboardViewModelTest {
     private val matchStore = FakeMatchStore()
     private val settingsStore = FakeSettingsStore(Settings(language = Language.EN))
     private val speaker = FakeSpeaker()
-    private val keys = HardwareKeyInput()
+    private val keys = RemoteKeyInput()
 
     @BeforeEach
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -45,7 +46,7 @@ class ScoreboardViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun TestScope.viewModel(): ScoreboardViewModel =
-        ScoreboardViewModel(matchStore, settingsStore, speaker, clock = { now }, hardwareKeys = keys)
+        ScoreboardViewModel(matchStore, settingsStore, speaker, clock = { now }, remoteKeys = keys)
             .also { runCurrent() }
 
     private val ScoreboardViewModel.ui get() = uiState.value
@@ -91,19 +92,19 @@ class ScoreboardViewModelTest {
 
     @Test
     fun `lock applies across input sources`() = runTest {
-        settingsStore.update { it.copy(hardwareButtons = true) }
+        settingsStore.update { it.copy(remoteKeys = RemoteKeys.fromVolumeKeys(blueOnLeft = true)) }
         val vm = viewModel()
         vm.onTap(Side.LEFT)
         now += 1000
         pressVolume(KeyEvent.KEYCODE_VOLUME_DOWN)
-        assertEquals(0, vm.points(Team.RED), "hardware key ignored during touch lock")
+        assertEquals(0, vm.points(Team.RED), "remote key ignored during touch lock")
 
         now += 500
         pressVolume(KeyEvent.KEYCODE_VOLUME_DOWN)
         assertEquals(1, vm.points(Team.RED), "accepted once the lock has passed")
         now += 10
         vm.onTap(Side.LEFT)
-        assertEquals(1, vm.points(Team.BLUE), "touch ignored during hardware-key lock")
+        assertEquals(1, vm.points(Team.BLUE), "touch ignored during remote-key lock")
     }
 
     @Test
@@ -118,15 +119,6 @@ class ScoreboardViewModelTest {
         assertEquals(2, vm.points(Team.BLUE))
     }
 
-    @Test
-    fun `hardware keys only score when enabled`() = runTest {
-        val vm = viewModel()
-        assertFalse(keys.onKey(KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.ACTION_DOWN, 0))
-        assertEquals(0, vm.points(Team.BLUE))
-        settingsStore.update { it.copy(hardwareButtons = true) }
-        pressVolume(KeyEvent.KEYCODE_VOLUME_UP)
-        assertEquals(1, vm.points(Team.BLUE))
-    }
 
     @Test
     fun `swap sides maps touch to the team shown on that side`() = runTest {
@@ -142,14 +134,6 @@ class ScoreboardViewModelTest {
         assertEquals(1, vm.points(Team.BLUE))
     }
 
-    @Test
-    fun `swap sides maps hardware keys to the team shown on that side`() = runTest {
-        settingsStore.update { it.copy(hardwareButtons = true) }
-        val vm = viewModel()
-        vm.onSwapSides()
-        pressVolume(KeyEvent.KEYCODE_VOLUME_UP)
-        assertEquals(1, vm.points(Team.RED), "volume up scores for the left side, now Red")
-    }
 
     @Test
     fun `undo is not blocked by the lock and announces a correction`() = runTest {

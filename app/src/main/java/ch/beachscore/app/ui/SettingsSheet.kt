@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import ch.beachscore.app.BuildConfig
 import ch.beachscore.app.R
 import ch.beachscore.app.data.Settings
+import ch.beachscore.app.input.RemoteAction
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
@@ -93,7 +94,7 @@ enum class MenuEntry(val label: Int, val tag: String) {
  * The menu as a side panel (landscape). At the top a short list: Settings · History · Players ·
  * Statistics · About. Settings (selected when the panel opens) and About show below the list;
  * the others open their screens through [onOpen]. Settings: points per set · announce ·
- * language · tap lock · hardware buttons · voice · test voice. Drawn in-window (not a dialog)
+ * language · tap lock · remote buttons · voice · test voice. Drawn in-window (not a dialog)
  * so immersive mode stays on.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,6 +114,10 @@ fun SettingsSheet(
     onSaveWords: (Language, Map<WordField, String>) -> Unit = { _, _ -> },
     onWordsEdited: () -> Unit = {},
     onOpen: (MenuEntry) -> Unit = {},
+    learning: RemoteAction? = null,
+    onLearn: (RemoteAction) -> Unit = {},
+    onCancelLearn: () -> Unit = {},
+    onClearRemote: (RemoteAction) -> Unit = {},
 ) {
     var section by rememberSaveable { mutableStateOf(MenuEntry.SETTINGS) }
     val scroll = rememberScrollState()
@@ -196,10 +201,7 @@ fun SettingsSheet(
 
                 TapLockSlider(settings.tapLockMs) { ms -> onChange { it.copy(tapLockMs = ms) } }
 
-                Column {
-                    SwitchRow(R.string.hardware_buttons, settings.hardwareButtons, "hardware") { on -> onChange { it.copy(hardwareButtons = on) } }
-                    Text(stringResource(R.string.hardware_buttons_hint), style = MaterialTheme.typography.bodySmall)
-                }
+                RemoteSection(settings, learning, onLearn, onCancelLearn, onClearRemote)
 
                 VoiceSection(settings, voice, voicePermissionDenied, onVoiceToggle, onChange)
                 if (settings.voiceCommands) VoiceWordsEditor(settings, wordsSave, onSaveWords, onWordsEdited)

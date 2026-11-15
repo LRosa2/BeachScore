@@ -35,9 +35,6 @@ class MainActivity : ComponentActivity() {
     private val viewModel: ScoreboardViewModel by viewModels { container.viewModelFactory }
     private val records: RecordsViewModel by viewModels { container.viewModelFactory }
 
-    /** Hardware keys and voice act only while the scoreboard itself is shown. */
-    private var scoreboardShown = true
-
     /** UI language this activity instance was created with; a change recreates it. */
     private lateinit var uiLanguage: Language
 
@@ -57,7 +54,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Volume keys (when not scoring) and announcements both use the media stream.
+        // Volume keys (when not remote buttons) and announcements both use the media stream.
         volumeControlStream = AudioManager.STREAM_MUSIC
         hideSystemBars()
 
@@ -68,8 +65,8 @@ class MainActivity : ComponentActivity() {
                     if (state.loaded && state.settings.language != uiLanguage) recreate()
                 }
                 BeachScoreRoot(viewModel, state, records) { screen ->
-                    scoreboardShown = screen == Screen.SCOREBOARD
-                    viewModel.onScoreboardVisible(scoreboardShown)
+                    // Voice and remote buttons act only while the scoreboard itself is shown.
+                    viewModel.onScoreboardVisible(screen == Screen.SCOREBOARD)
                 }
             }
         }
@@ -95,7 +92,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (scoreboardShown && container.hardwareKeys.onKey(event.keyCode, event.action, event.repeatCount)) return true
+        // Every key reaches the activity before the system acts on it (volume change, media
+        // session); the remote input decides (scoreboard shown, no menu, or learning).
+        if (container.remoteKeys.onKey(event.keyCode, event.action, event.repeatCount)) return true
         return super.dispatchKeyEvent(event)
     }
 

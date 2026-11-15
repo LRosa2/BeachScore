@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import ch.beachscore.app.input.RemoteKeys
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.MicChoice
@@ -38,7 +39,14 @@ class SettingsRepository(
             prefs[ANNOUNCE] = new.announce
             prefs[LANGUAGE] = new.language.tag
             prefs[TAP_LOCK_MS] = new.tapLockMs
-            prefs[HARDWARE_BUTTONS] = new.hardwareButtons
+            // Until the hand-over the old toggle stays and no remote buttons are written, so
+            // "not yet migrated" survives other changes; afterwards only the new key exists.
+            if (new.legacyVolumeKeys) {
+                prefs.remove(REMOTE_KEYS)
+            } else {
+                prefs[REMOTE_KEYS] = new.remoteKeys.encode()
+                prefs.remove(HARDWARE_BUTTONS)
+            }
             prefs[VOICE_COMMANDS] = new.voiceCommands
             prefs[VOICE_SENSITIVITY] = new.voiceSensitivity.name
             prefs[SHOW_HEARD] = new.showHeard
@@ -58,7 +66,8 @@ class SettingsRepository(
             announce = this[ANNOUNCE] ?: defaults.announce,
             language = Language.fromTag(this[LANGUAGE]) ?: defaults.language,
             tapLockMs = this[TAP_LOCK_MS] ?: defaults.tapLockMs,
-            hardwareButtons = this[HARDWARE_BUTTONS] ?: defaults.hardwareButtons,
+            remoteKeys = RemoteKeys.decode(this[REMOTE_KEYS]),
+            legacyVolumeKeys = this[REMOTE_KEYS] == null && this[HARDWARE_BUTTONS] == true,
             voiceCommands = this[VOICE_COMMANDS] ?: defaults.voiceCommands,
             voiceSensitivity = VoiceSensitivity.entries.firstOrNull { it.name == this[VOICE_SENSITIVITY] }
                 ?: defaults.voiceSensitivity,
@@ -76,7 +85,9 @@ class SettingsRepository(
         val ANNOUNCE = booleanPreferencesKey("announce")
         val LANGUAGE = stringPreferencesKey("language")
         val TAP_LOCK_MS = longPreferencesKey("tap_lock_ms")
+        /** 3.3 and earlier: volume keys score left/right. Read once for the migration. */
         val HARDWARE_BUTTONS = booleanPreferencesKey("hardware_buttons")
+        val REMOTE_KEYS = stringPreferencesKey("remote_keys")
         val VOICE_COMMANDS = booleanPreferencesKey("voice_commands")
         val VOICE_SENSITIVITY = stringPreferencesKey("voice_sensitivity")
         val SHOW_HEARD = booleanPreferencesKey("show_heard")

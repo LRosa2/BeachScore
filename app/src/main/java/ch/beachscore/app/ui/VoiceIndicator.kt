@@ -104,7 +104,7 @@ private fun HeardText(heard: Heard) {
     }
 }
 
-private fun reasonText(reason: RejectReason): Int = when (reason) {
+internal fun reasonText(reason: RejectReason): Int = when (reason) {
     RejectReason.UNKNOWN -> R.string.reason_unknown
     RejectReason.MULTIPLE -> R.string.reason_multiple
     RejectReason.IN_SPEECH -> R.string.reason_in_speech

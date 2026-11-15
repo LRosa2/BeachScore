@@ -3,9 +3,11 @@ package ch.beachscore.app.ui
 import ch.beachscore.app.data.Settings
 import ch.beachscore.app.history.Lineup
 import ch.beachscore.app.history.Player
+import ch.beachscore.app.input.RemoteAction
 import ch.beachscore.app.score.Team
 import ch.beachscore.app.speech.SpeechAvailability
 import ch.beachscore.app.voice.Heard
+import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.InputDevice
 import ch.beachscore.app.voice.VoiceStatus
 import ch.beachscore.app.voice.WordProblem
@@ -16,6 +18,9 @@ data class SetWonUi(val winner: Team, val winnerPoints: Int, val loserPoints: In
 
 /** The most recent accepted point; [seq] changes on every point so the UI can re-run its flash. */
 data class PointFlash(val team: Team, val seq: Int)
+
+/** The last remote button press and what came of it; [seq] changes with every press. */
+data class RemotePress(val action: RemoteAction, val verdict: Verdict, val seq: Int)
 
 /** Result of the last "Save" of the voice words. */
 sealed interface WordsSave {
@@ -44,6 +49,10 @@ data class ScoreboardUiState(
     /** Voice commands could not be (or stay) on because the microphone permission is missing. */
     val voicePermissionDenied: Boolean = false,
     val wordsSave: WordsSave = WordsSave.Idle,
+    /** "Remote buttons": the action waiting for a key press, or null. */
+    val learning: RemoteAction? = null,
+    /** Short confirmation of the last remote press (null when faded). */
+    val remotePress: RemotePress? = null,
 )
 
 /**

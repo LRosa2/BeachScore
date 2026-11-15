@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +75,9 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, on
     var pickerTeam by rememberSaveable { mutableStateOf<Team?>(null) }
     var speechNoticeDismissed by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    // Remote buttons pause while the menu or the picker covers the scoreboard.
+    val panelOpen = showSettings || pickerTeam != null
+    LaunchedEffect(panelOpen) { viewModel.onPanelOpen(panelOpen) }
     // Asked only when the user switches voice commands on; never at start.
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.onMicPermissionResult(granted)
@@ -130,6 +134,10 @@ fun ScoreboardRoute(viewModel: ScoreboardViewModel, state: ScoreboardUiState, on
             wordsSave = state.wordsSave,
             onSaveWords = viewModel::saveVoiceWords,
             onWordsEdited = viewModel::onVoiceWordsEdited,
+            learning = state.learning,
+            onLearn = viewModel::startLearning,
+            onCancelLearn = viewModel::cancelLearning,
+            onClearRemote = viewModel::clearRemote,
         )
     }
 }
@@ -145,7 +153,7 @@ fun ScoreboardScreen(
     onOpenMenu: () -> Unit,
     onNames: (Team) -> Unit = {},
 ) {
-    // Left means left on screen, whatever the locale: hardware keys and swap rely on it.
+    // Left means left on screen, whatever the locale: taps and swap rely on it.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             if (!state.loaded) return@Box
@@ -172,7 +180,10 @@ fun ScoreboardScreen(
                 }
             }
             LockBar(state, Modifier.align(Alignment.TopCenter))
-            VoiceIndicator(state.voice, Modifier.align(Alignment.TopCenter))
+            Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                VoiceIndicator(state.voice)
+                RemoteIndicator(state.remotePress)
+            }
             ControlStrip(
                 canUndo = state.canUndo,
                 onUndo = onUndo,

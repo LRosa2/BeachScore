@@ -7,7 +7,8 @@ import ch.beachscore.app.fakes.FakeMatchStore
 import ch.beachscore.app.fakes.FakeSettingsStore
 import ch.beachscore.app.fakes.FakeSpeaker
 import ch.beachscore.app.fakes.FakeVoice
-import ch.beachscore.app.input.HardwareKeyInput
+import ch.beachscore.app.input.RemoteKeyInput
+import ch.beachscore.app.input.RemoteKeys
 import ch.beachscore.app.input.ScoreCommand
 import ch.beachscore.app.input.Side
 import ch.beachscore.app.score.Language
@@ -46,7 +47,7 @@ class ScoreboardViewModelVoiceTest {
     private val matchStore = FakeMatchStore()
     private val settingsStore = FakeSettingsStore(Settings(language = Language.EN, voiceCommands = true))
     private val speaker = FakeSpeaker()
-    private val keys = HardwareKeyInput()
+    private val keys = RemoteKeyInput()
     private val voice = FakeVoice()
 
     @BeforeEach
@@ -56,7 +57,7 @@ class ScoreboardViewModelVoiceTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun TestScope.viewModel(foreground: Boolean = true, permission: Boolean = true): ScoreboardViewModel =
-        ScoreboardViewModel(matchStore, settingsStore, speaker, clock = { now }, hardwareKeys = keys, voice = voice)
+        ScoreboardViewModel(matchStore, settingsStore, speaker, clock = { now }, remoteKeys = keys, voice = voice)
             .also {
                 runCurrent()
                 it.onMicPermission(permission)
@@ -83,7 +84,7 @@ class ScoreboardViewModelVoiceTest {
 
     @Test
     fun `voice points go through the same tap lock as touch and keys`() = runTest {
-        settingsStore.update { it.copy(hardwareButtons = true) }
+        settingsStore.update { it.copy(remoteKeys = RemoteKeys.fromVolumeKeys(blueOnLeft = true)) }
         val vm = viewModel()
         vm.onTap(Side.LEFT)
         now += 300

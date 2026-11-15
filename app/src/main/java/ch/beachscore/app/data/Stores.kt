@@ -1,6 +1,7 @@
 package ch.beachscore.app.data
 
 import ch.beachscore.app.history.Lineup
+import ch.beachscore.app.input.RemoteKeys
 import ch.beachscore.app.input.TapLock
 import ch.beachscore.app.score.Language
 import ch.beachscore.app.score.MatchState
@@ -16,7 +17,13 @@ data class Settings(
     val announce: Boolean = true,
     val language: Language = Language.EN,
     val tapLockMs: Long = TapLock.DEFAULT_MS,
-    val hardwareButtons: Boolean = false,
+    /** "Remote buttons" (3.4.0): learned keys for Blue point, Red point and Undo. */
+    val remoteKeys: RemoteKeys = RemoteKeys(),
+    /**
+     * The 3.3 toggle "Hardware buttons score points" was on and has not been handed over to
+     * [remoteKeys] yet (the view model does that once it knows the sides; see [RemoteKeys.fromVolumeKeys]).
+     */
+    val legacyVolumeKeys: Boolean = false,
     /** Phase 2: listen for spoken commands. Off by default; needs RECORD_AUDIO. */
     val voiceCommands: Boolean = false,
     val voiceSensitivity: VoiceSensitivity = VoiceSensitivity.NORMAL,

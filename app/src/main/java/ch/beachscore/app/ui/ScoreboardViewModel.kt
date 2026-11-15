@@ -6,7 +6,9 @@ import ch.beachscore.app.data.MatchStore
 import ch.beachscore.app.data.PersistedMatch
 import ch.beachscore.app.data.Settings
 import ch.beachscore.app.data.SettingsStore
-import ch.beachscore.app.input.HardwareKeyInput
+import ch.beachscore.app.input.RemoteAction
+import ch.beachscore.app.input.RemoteKeyInput
+import ch.beachscore.app.input.RemoteKeys
 import ch.beachscore.app.input.ScoreCommand
 import ch.beachscore.app.input.ScoreInput
 import ch.beachscore.app.input.Side
@@ -50,15 +52,15 @@ import kotlinx.coroutines.launch
  * Wires every input → [TapLock] → [ScoreEngine] → [MatchStore] → [Speaker], and exposes one
  * [uiState]. All state changes happen on the main thread.
  *
- * Inputs speak in sides; this class maps a side to a team using the swap state, so touch and
- * hardware keys always score for the team that is shown on that side.
+ * Touch speaks in sides; this class maps a side to a team using the swap state, so a tap
+ * always scores for the team that is shown on that side. Voice and remote buttons name the team.
  */
 class ScoreboardViewModel(
     private val matchStore: MatchStore,
     private val settingsStore: SettingsStore,
     private val speaker: Speaker,
     clock: () -> Long,
-    private val hardwareKeys: HardwareKeyInput = HardwareKeyInput(),
+    private val remoteKeys: RemoteKeyInput = RemoteKeyInput(),
     private val voice: VoiceControl? = null,
     extraInputs: List<ScoreInput> = emptyList(),
     private val history: HistoryStore? = null,
@@ -77,6 +79,10 @@ class ScoreboardViewModel(
 
     private var foreground = false
     private var scoreboardVisible = true
+    /** Menu or lineup picker over the scoreboard: remote buttons pause (except learning). */
+    private var panelOpen = false
+    private var remoteJob: Job? = null
+    private var remoteSeq = 0
     private var micPermission = false
     private var heardJob: Job? = null
     private var allPlayers: Map<Long, Player> = emptyMap()
@@ -95,6 +101,7 @@ class ScoreboardViewModel(
             match = restored ?: PersistedMatch(MatchState.new(initialSettings.pointsPerSet))
             syncTarget()
             publish(loaded = true)
+            updateRemoteActive()
 
             launch { pendingSave.filterNotNull().collect { matchStore.save(it) } }
             launch {
@@ -109,9 +116,12 @@ class ScoreboardViewModel(
             if (players != null) launch { players.players.collect(::onPlayers) }
             updateListening()
             launch {
-                merge(touch.commands, hardwareKeys.commands, *extraInputs.map { it.commands }.toTypedArray())
+                merge(touch.commands, *extraInputs.map { it.commands }.toTypedArray())
                     .collect { handle(it) }
             }
+            launch { remoteKeys.commands.collect(::onRemote) }
+            launch { remoteKeys.learned.collect { (action, keyCode) -> onLearned(action, keyCode) } }
+            if (initialSettings.legacyVolumeKeys) launch { migrateVolumeKeys() }
         }
         viewModelScope.launch {
             speaker.availability.collect { availability -> _uiState.update { it.copy(speech = availability) } }
@@ -197,11 +207,33 @@ class ScoreboardViewModel(
         updateListening()
     }
 
-    /** History and statistics screens hide the scoreboard; voice pauses meanwhile. */
+    /** History and statistics screens hide the scoreboard; voice and remote buttons pause meanwhile. */
     fun onScoreboardVisible(visible: Boolean) {
         scoreboardVisible = visible
         updateListening()
+        updateRemoteActive()
     }
+
+    /** The menu or the lineup picker opened or closed. Closing ends a learn. */
+    fun onPanelOpen(open: Boolean) {
+        panelOpen = open
+        if (!open) cancelLearning()
+        updateRemoteActive()
+    }
+
+    /** "Assign": the next key press (from any device) is stored for [action]. */
+    fun startLearning(action: RemoteAction) {
+        remoteKeys.learning = action
+        _uiState.update { it.copy(learning = action) }
+    }
+
+    fun cancelLearning() {
+        remoteKeys.learning = null
+        _uiState.update { it.copy(learning = null) }
+    }
+
+    /** "Clear": [action] has no buttons any more. */
+    fun clearRemote(action: RemoteAction) = updateSettings { it.copy(remoteKeys = it.remoteKeys.clear(action)) }
 
     /** Current RECORD_AUDIO grant, checked by the activity whenever it starts. */
     fun onMicPermission(granted: Boolean) {
@@ -303,6 +335,42 @@ class ScoreboardViewModel(
         }
     }
 
+    private fun onLearned(action: RemoteAction, keyCode: Int) {
+        _uiState.update { it.copy(learning = null) }
+        updateSettings { it.copy(remoteKeys = it.remoteKeys.assign(action, keyCode)) }
+    }
+
+    /** A remote press: the same handling as touch, plus a short confirmation on the scoreboard. */
+    private fun onRemote(command: ScoreCommand) {
+        val verdict = handle(command)
+        val action = RemoteAction.entries.first { it.command == command }
+        remoteJob?.cancel()
+        _uiState.update { it.copy(remotePress = RemotePress(action, verdict, ++remoteSeq)) }
+        remoteJob = viewModelScope.launch {
+            delay(REMOTE_VISIBLE_MS)
+            _uiState.update { it.copy(remotePress = null) }
+        }
+    }
+
+    /**
+     * 3.3's "Hardware buttons score points" was on: Volume + now scores for the team shown on
+     * the left, Volume − for the one on the right — from now on following those teams.
+     */
+    private suspend fun migrateVolumeKeys() {
+        val blueOnLeft = match?.blueOnLeft ?: true
+        settingsStore.update { current ->
+            if (!current.legacyVolumeKeys) current
+            else current.copy(remoteKeys = RemoteKeys.fromVolumeKeys(blueOnLeft), legacyVolumeKeys = false)
+        }
+        // Applied here as well: the settings collector may have subscribed after the write.
+        applySettings(settingsStore.settings.first())
+        publish()
+    }
+
+    private fun updateRemoteActive() {
+        remoteKeys.active = match != null && scoreboardVisible && !panelOpen
+    }
+
     private fun onPlayers(list: List<Player>) {
         allPlayers = list.associateBy { it.id }
         val current = match
@@ -354,7 +422,7 @@ class ScoreboardViewModel(
         if (new.language != settings.language) setWordsSave(WordsSave.Idle)
         settings = new
         tapLock.durationMs = new.tapLockMs
-        hardwareKeys.enabled = new.hardwareButtons
+        remoteKeys.keys = new.remoteKeys
         speaker.prepare(new.language)
     }
 
@@ -413,5 +481,8 @@ class ScoreboardViewModel(
     companion object {
         /** How long the "what was heard" line stays before it fades. */
         const val HEARD_VISIBLE_MS = 4000L
+
+        /** How long the confirmation of a remote press stays. */
+        const val REMOTE_VISIBLE_MS = 2500L
     }
 }
