@@ -612,3 +612,54 @@ confidence from weak pairs ("punkt:0.65 blau" after "schöner Aufschlag"). Laten
 one-go commands unchanged (median 240 ms). Chatter cost of joining: a sentence ending in
 the point word followed by one starting with a team word ("… a great point. Red serves")
 can join.
+
+## 3.4.0 — remote buttons (added 2026-11-15)
+
+Voice turned out unreliable even indoors. A small Bluetooth media remote worn by a player
+(volume +/−, play/pause, next, previous; it pairs as a keyboard / HID device) scores instead.
+It replaces "Hardware buttons score points" (volume up = left, volume down = right).
+
+### Settings: "Remote buttons" / "Fernbedienung"
+
+- Three actions: **Blue point**, **Red point**, **Undo**. Each row shows the assigned buttons
+  by a readable name ("Volume +", "Next track", "A", or "Key 87" as a fallback), or "Not
+  assigned", with **Assign** and **Clear**.
+- **Assign** is a learn mode: the row says "Press a button on the remote…" with **Cancel**;
+  the next key press from any device is stored for that action. A button already assigned
+  to another action moves to this one. Up to 3 buttons per action (two remotes can both
+  work); a fourth replaces the oldest. Closing the menu cancels learning.
+- Not learnable (they pass through): system keys — Home, Back, Power, App switch, Call,
+  End call, Search, Notification, Assist, Voice assist, Sleep, Wake up, Brightness, All apps,
+  Settings, SysRq, and "unknown". Everything else can be learned: media keys (next,
+  previous, play/pause, play, pause, headset hook), volume keys, Enter, D-pad, letters …
+- Actions follow the **team**, not the court side, so they stay right after "Swap sides".
+
+### Behaviour
+
+- A mapped key is consumed on the scoreboard: the volume does not change, no volume panel
+  appears, music does not start. Unmapped keys behave as normal. Auto-repeat of a held
+  button is consumed and ignored (one press = one action); the matching key-up is consumed
+  as well.
+- Presses go through the same `ScoreInput` seam and the same tap lock as touch and voice;
+  Undo ends the lock. The score is spoken as usual.
+- Presses are ignored (the key keeps its normal meaning) while the menu, the lineup picker
+  or another screen is open — except in learn mode. With the set-won overlay up they behave
+  like touch there: points are blocked, Undo works.
+- Confirmation: a small pill under the voice indicator for 2.5 s, "Remote: Blue point ✓" or
+  "Remote: Red point ✗ locked", so a player can glance at the result from afar.
+
+### How keys reach the app
+
+Key events from a Bluetooth HID remote go through the input dispatcher to the focused
+window: `MainActivity.dispatchKeyEvent` sees volume and media keys before the system acts on
+them (the system's fallback — volume change, media session — only runs when the activity
+does not consume the key). No permission needed. Remotes that send media buttons over AVRCP
+(as audio devices, not as a keyboard) bypass the window and go to the active media session;
+they are not supported.
+
+### Migration
+
+The old toggle's key `hardware_buttons` is read once: if it was on and no remote buttons
+are stored yet, Volume + is assigned to the team shown on the left and Volume − to the team
+on the right at the moment of the first start of 3.4.0 (from the saved swap state). From then
+on they follow those teams. The old toggle is removed from settings.
