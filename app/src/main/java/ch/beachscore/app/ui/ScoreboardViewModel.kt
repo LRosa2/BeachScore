@@ -262,7 +262,7 @@ class ScoreboardViewModel(
                 is WordsCheck.Failed -> return@launch setWordsSave(WordsSave.Failed(check.problem))
                 is WordsCheck.Ok -> check.words
             }
-            if (!words.isEmpty) {
+            if (words.all.isNotEmpty()) {
                 setWordsSave(WordsSave.Checking)
                 val unknown = voice.unknownWords(language, words.all)
                     ?: return@launch setWordsSave(WordsSave.Failed(WordProblem.ModelUnavailable))

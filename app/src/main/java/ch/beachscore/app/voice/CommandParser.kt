@@ -11,6 +11,7 @@ import ch.beachscore.app.score.Team
  *  - A command is *spotted* anywhere in the result: the point word and a team word next to
  *    each other in either order ("punkt blau" / "blau punkt"), or the undo word. Other words
  *    and `[unk]` around it do not matter; command words that are not adjacent are not a command.
+ *    Without a point word ([CommandWords.point] empty, 3.4.1) a team word alone is the command.
  *  - Only the command words must reach the confidence threshold.
  *  - The same command several times counts once; two different commands give none.
  *  - Undo counts only with nothing but `[unk]` (noise) around it: the word is common in
@@ -78,7 +79,8 @@ object CommandParser {
                 add("$t $p")
             }
             add(words.undo)
-            if (halves) addAll(words.point - words.alike + words.blue + words.red)
+            // No point word (3.4.1): a team word alone is the command.
+            if (halves || words.point.isEmpty()) addAll(words.point - words.alike + words.blue + words.red)
         }
         val active = words.all.toSet()
         val decoys = (DECOYS.getValue(words.language) + words.replaced).distinct().filter { it !in active }
@@ -107,6 +109,11 @@ object CommandParser {
         val out = mutableListOf<Match>()
         for (i in tokens.indices) {
             if (tokens[i] == words.undo) out += Match(ScoreCommand.Undo, i, i)
+            if (words.point.isEmpty()) {
+                // No point word: every team word is a point command on its own.
+                team(tokens[i])?.let { out += Match(ScoreCommand.TeamPoint(it), i, i) }
+                continue
+            }
             if (i + 1 < tokens.size) {
                 val a = tokens[i]
                 val b = tokens[i + 1]

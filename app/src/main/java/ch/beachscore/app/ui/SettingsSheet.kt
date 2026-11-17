@@ -378,7 +378,7 @@ private fun VoiceWordsEditor(
     val language = settings.language
     val stored = settings.voiceWords[language] ?: CustomWords()
     val texts = remember(language, stored) {
-        mutableStateMapOf<WordField, String>().apply { WordField.entries.forEach { put(it, VoiceWords.display(stored[it])) } }
+        mutableStateMapOf<WordField, String>().apply { WordField.entries.forEach { put(it, VoiceWords.fieldText(language, stored, it)) } }
     }
     val defaults = CommandWords.defaultsOf(language)
     val languageName = stringResource(if (language == Language.DE) R.string.language_de else R.string.language_en)
@@ -395,11 +395,19 @@ private fun VoiceWordsEditor(
                 value = texts[field].orEmpty(),
                 onValueChange = { texts[field] = it; onEdited() },
                 label = { Text(name) },
-                supportingText = { Text(stringResource(R.string.voice_words_default, VoiceWords.display(defaults[field]))) },
+                supportingText = {
+                    Text(
+                        stringResource(
+                            if (field == WordField.POINT) R.string.voice_words_default_point else R.string.voice_words_default,
+                            VoiceWords.display(defaults[field]),
+                        ),
+                    )
+                },
                 trailingIcon = {
                     IconButton(
                         onClick = {
-                            texts[field] = ""
+                            // Back to the default: an empty team field, the default words in the point field.
+                            texts[field] = VoiceWords.fieldText(language, CustomWords(), field)
                             onSave(language, texts.toMap())
                         },
                         enabled = save != WordsSave.Checking,

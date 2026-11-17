@@ -124,4 +124,11 @@ class EarlyFinalizerTest {
         assertEquals("zurück", VoskResult.parsePartial("""{"partial":"zurück"}"""))
         assertEquals(null, VoskResult.parsePartial("""{"text" : "x"}"""))
     }
+
+    @Test
+    fun `without a point word a team word alone ends the utterance after the short wait`() {
+        val finalizer = EarlyFinalizer(CommandWords.of(Language.DE, CustomWords(pointOff = true)), sampleRate = 16000)
+        assertFalse(finalizer.shouldFinalize("blau", 0))
+        assertTrue(finalizer.shouldFinalize("blau", 16000L * EarlyFinalizer.POINT_STABLE_MS / 1000))
+    }
 }

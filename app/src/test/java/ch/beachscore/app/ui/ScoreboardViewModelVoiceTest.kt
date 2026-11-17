@@ -301,8 +301,9 @@ class ScoreboardViewModelVoiceTest {
 
     // --- voice words (3.3.0) -----------------------------------------------------------------
 
-    private fun fields(blue: String = "", red: String = "", point: String = "") =
-        mapOf(WordField.BLUE to blue, WordField.RED to red, WordField.POINT to point)
+    /** [point] null: the field is not given, which means its default words. */
+    private fun fields(blue: String = "", red: String = "", point: String? = null) =
+        mapOf(WordField.BLUE to blue, WordField.RED to red) + (point?.let { mapOf(WordField.POINT to it) } ?: emptyMap())
 
     @Test
     fun `the recogniser listens for the active words of the app language`() = runTest {

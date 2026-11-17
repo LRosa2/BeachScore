@@ -7,12 +7,14 @@ enum class WordField { BLUE, RED, POINT }
 
 /**
  * The user's words for one language, as stored. An empty list means "the defaults" for that
- * field; a filled one replaces them.
+ * field; a filled one replaces them. [pointOff] (3.4.1) means no point word at all: a team
+ * word alone scores.
  */
 data class CustomWords(
     val blue: List<String> = emptyList(),
     val red: List<String> = emptyList(),
     val point: List<String> = emptyList(),
+    val pointOff: Boolean = false,
 ) {
     operator fun get(field: WordField): List<String> = when (field) {
         WordField.BLUE -> blue
@@ -27,7 +29,7 @@ data class CustomWords(
     }
 
     val all: List<String> get() = blue + red + point
-    val isEmpty: Boolean get() = all.isEmpty()
+    val isEmpty: Boolean get() = all.isEmpty() && !pointOff
 }
 
 /**
@@ -68,8 +70,9 @@ data class CommandWords(
 
         fun of(language: Language, custom: CustomWords): CommandWords {
             val defaults = DEFAULTS.getValue(language)
-            fun pick(field: WordField) = custom[field].ifEmpty { defaults[field] }
-            val replaced = WordField.entries.filter { custom[it].isNotEmpty() }.flatMap { defaults[it] }
+            fun off(field: WordField) = field == WordField.POINT && custom.pointOff
+            fun pick(field: WordField) = if (off(field)) emptyList() else custom[field].ifEmpty { defaults[field] }
+            val replaced = WordField.entries.filter { custom[it].isNotEmpty() || off(it) }.flatMap { defaults[it] }
             val active = WordField.entries.flatMap(::pick).toSet()
             return CommandWords(
                 language = language,
@@ -78,7 +81,7 @@ data class CommandWords(
                 red = pick(WordField.RED),
                 undo = UNDO.getValue(language),
                 replaced = replaced.filter { it !in active },
-                alike = if (custom.point.isEmpty()) ALIKE.getValue(language) else emptySet(),
+                alike = if (custom.point.isEmpty() && !custom.pointOff) ALIKE.getValue(language) else emptySet(),
             )
         }
     }
@@ -114,15 +117,20 @@ object VoiceWords {
      */
     fun check(language: Language, fields: Map<WordField, String>): WordsCheck {
         var custom = CustomWords()
+        val defaults = CommandWords.defaultsOf(language)
         for (field in WordField.entries) {
             val entries = split(fields[field].orEmpty())
             entries.firstOrNull { !it.matches(WORD) }?.let { return WordsCheck.Failed(WordProblem.NotOneWord(it)) }
-            custom = custom.with(field, entries.distinct())
+            custom = when {
+                // The point field shows its default words; emptied, a team word alone scores.
+                field == WordField.POINT && fields[field] != null && entries.isEmpty() -> custom.copy(pointOff = true)
+                field == WordField.POINT && entries.toSet() == defaults.point.toSet() -> custom
+                else -> custom.with(field, entries.distinct())
+            }
         }
         val undo = CommandWords.undoWord(language)
         custom.all.firstOrNull { it == undo }?.let { return WordsCheck.Failed(WordProblem.UndoWord(it)) }
-        val defaults = CommandWords.defaultsOf(language)
-        val effective = WordField.entries.flatMap { custom[it].ifEmpty { defaults[it] } }
+        val effective = CommandWords.of(language, custom).let { it.point + it.blue + it.red }
         effective.groupingBy { it }.eachCount().entries.firstOrNull { it.value > 1 }
             ?.let { return WordsCheck.Failed(WordProblem.Duplicate(it.key)) }
         return WordsCheck.Ok(custom)
@@ -136,6 +144,19 @@ object VoiceWords {
 
     /** The text shown in a field for editing. */
     fun display(words: List<String>): String = words.joinToString(", ")
+
+    /**
+     * The text of [field] for editing: the stored words; the point field shows its default
+     * words when nothing is stored, and is empty only when the point word is off.
+     */
+    fun fieldText(language: Language, stored: CustomWords, field: WordField): String = when {
+        field != WordField.POINT -> display(stored[field])
+        stored.pointOff -> ""
+        else -> display(stored.point.ifEmpty { CommandWords.defaultsOf(language).point })
+    }
+
+    /** Stored value of the point field when the point word is off. */
+    const val POINT_OFF = "-"
 
     private fun split(text: String): List<String> =
         text.split(',').map { it.trim().replace(Regex("\\s+"), " ").lowercase() }.filter { it.isNotEmpty() }

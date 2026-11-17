@@ -54,7 +54,10 @@ class SettingsRepository(
             prefs[VOICE_PAUSE_MS] = new.voicePauseMs
             for (language in Language.entries) {
                 val words = new.voiceWords[language] ?: CustomWords()
-                for (field in WordField.entries) prefs[wordsKey(language, field)] = VoiceWords.encode(words[field])
+                for (field in WordField.entries) {
+                    val off = field == WordField.POINT && words.pointOff
+                    prefs[wordsKey(language, field)] = if (off) VoiceWords.POINT_OFF else VoiceWords.encode(words[field])
+                }
             }
         }
     }
@@ -75,7 +78,11 @@ class SettingsRepository(
             microphone = MicChoice.decode(this[MICROPHONE]),
             voicePauseMs = this[VOICE_PAUSE_MS] ?: defaults.voicePauseMs,
             voiceWords = Language.entries.associateWith { language ->
-                WordField.entries.fold(CustomWords()) { words, field -> words.with(field, VoiceWords.decode(this[wordsKey(language, field)])) }
+                WordField.entries.fold(CustomWords()) { words, field ->
+                    val raw = this[wordsKey(language, field)]
+                    if (field == WordField.POINT && raw == VoiceWords.POINT_OFF) words.copy(pointOff = true)
+                    else words.with(field, VoiceWords.decode(raw))
+                }
             }.filterValues { !it.isEmpty },
         ).sanitized()
     }
@@ -94,7 +101,7 @@ class SettingsRepository(
         val MICROPHONE = stringPreferencesKey("microphone")
         val VOICE_PAUSE_MS = longPreferencesKey("voice_pause_ms")
 
-        /** "voice_words_de_blue", ...: comma separated, empty for the defaults. */
+        /** "voice_words_de_blue", ...: comma separated, empty for the defaults; point "-" for none. */
         fun wordsKey(language: Language, field: WordField) =
             stringPreferencesKey("voice_words_${language.tag}_${field.name.lowercase()}")
     }

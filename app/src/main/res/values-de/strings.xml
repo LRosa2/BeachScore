@@ -162,6 +162,7 @@
     <string name="voice_words_red">Team Rot</string>
     <string name="voice_words_point">Punkt</string>
     <string name="voice_words_default">Standard: %1$s</string>
+    <string name="voice_words_default_point">Standard: %1$s. Leer lassen: das Teamwort allein zählt.</string>
     <string name="voice_words_reset_description">%1$s auf Standard zurücksetzen</string>
     <string name="voice_words_save">Wörter speichern</string>
     <string name="voice_words_hint">Mehrere Wörter mit Komma trennen. Kurze, häufige Wörter geben mehr falsche Punkte. Rückgängig bleibt „%1$s“.</string>

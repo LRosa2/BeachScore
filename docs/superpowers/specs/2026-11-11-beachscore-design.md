@@ -665,3 +665,20 @@ The old toggle's key `hardware_buttons` is read once: if it was on and no remote
 are stored yet, Volume + is assigned to the team shown on the left and Volume − to the team
 on the right at the moment of the first start of 3.4.0 (from the saved swap state). From then
 on they follow those teams. The old toggle is removed from settings.
+
+## 3.4.1 — team word alone (added 2026-11-17)
+
+The point field of the voice words can be emptied. Then there is no point word: a team word
+alone ("Blau", "Rot", or the user's team words) scores the point.
+
+- The point field now shows its default words ("punkt, punk" / "point, points") instead of
+  being empty. Emptying it and saving turns the point word off; the reset icon puts the default
+  words back. The default words typed in are stored as "default". The team fields are unchanged
+  (empty means default).
+- Stored as `-` in the point key of the language; existing installs keep their setting.
+- Grammar: the team words and undo, no pairs; the default point words stay as decoys, so the
+  old "Punkt Blau" still gives one point for blue.
+- The other rules stay: confidence threshold, at most four words of talk before the word, the
+  same team twice counts once, both teams in one result give nothing, echo guard, tap lock.
+- Expected cost: more false points, since a single colour word turns up in ordinary talk.
+  Not measured; only unit tests were run for this version.

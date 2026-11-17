@@ -8,8 +8,9 @@ import org.junit.jupiter.api.Test
 
 class VoiceWordsTest {
 
-    private fun fields(blue: String = "", red: String = "", point: String = "") =
-        mapOf(WordField.BLUE to blue, WordField.RED to red, WordField.POINT to point)
+    /** [point] null: the field is not given, which means its default words. */
+    private fun fields(blue: String = "", red: String = "", point: String? = null) =
+        mapOf(WordField.BLUE to blue, WordField.RED to red) + (point?.let { mapOf(WordField.POINT to it) } ?: emptyMap())
 
     @Test
     fun `defaults per language, with the new point variants`() {
@@ -97,5 +98,43 @@ class VoiceWordsTest {
     fun `the field text shown for editing`() {
         assertEquals("himmel, azur", VoiceWords.display(listOf("himmel", "azur")))
         assertEquals("", VoiceWords.display(emptyList()))
+    }
+
+    // --- no point word (3.4.1) ---------------------------------------------------------------
+
+    @Test
+    fun `an emptied point field turns the point word off`() {
+        assertEquals(WordsCheck.Ok(CustomWords(pointOff = true)), VoiceWords.check(Language.DE, fields(point = " ")))
+        assertFalse(CustomWords(pointOff = true).isEmpty)
+    }
+
+    @Test
+    fun `the default words typed into the point field are the default`() {
+        assertEquals(WordsCheck.Ok(CustomWords()), VoiceWords.check(Language.DE, fields(point = "Punkt, punk")))
+        assertEquals(WordsCheck.Ok(CustomWords()), VoiceWords.check(Language.EN, fields(point = "points,point")))
+    }
+
+    @Test
+    fun `without a point word only the team words and undo are listened for`() {
+        val words = CommandWords.of(Language.DE, CustomWords(pointOff = true))
+        assertEquals(emptyList<String>(), words.point)
+        assertEquals(listOf("blau"), words.blue)
+        assertEquals(listOf("rot"), words.red)
+        assertEquals(listOf("punkt", "punk"), words.replaced)
+        assertEquals(emptySet<String>(), words.alike)
+    }
+
+    @Test
+    fun `the point field shows its default words and is empty only when off`() {
+        assertEquals("punkt, punk", VoiceWords.fieldText(Language.DE, CustomWords(), WordField.POINT))
+        assertEquals("treffer", VoiceWords.fieldText(Language.DE, CustomWords(point = listOf("treffer")), WordField.POINT))
+        assertEquals("", VoiceWords.fieldText(Language.DE, CustomWords(pointOff = true), WordField.POINT))
+        assertEquals("", VoiceWords.fieldText(Language.DE, CustomWords(), WordField.BLUE))
+    }
+
+    @Test
+    fun `a default point word may become a team word once the point word is off`() {
+        val check = VoiceWords.check(Language.DE, fields(blue = "punkt", point = ""))
+        assertEquals(WordsCheck.Ok(CustomWords(blue = listOf("punkt"), pointOff = true)), check)
     }
 }

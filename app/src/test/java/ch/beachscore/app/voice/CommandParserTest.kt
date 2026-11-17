@@ -338,4 +338,74 @@ class CommandParserTest {
         assertEquals(decoys.size, decoys.toSet().size)
         assertEquals("[unk]", grammar.last())
     }
+
+    // --- no point word (3.4.1): a team word alone scores ---------------------------------------
+
+    private val teamOnly = CommandWords.of(Language.DE, CustomWords(pointOff = true))
+
+    private fun heard(vararg words: Pair<String, Double>) =
+        VoskResult(words.joinToString(" ") { it.first }, words.map { VoskResult.Word(it.first, it.second) })
+
+    @Test
+    fun `without a point word the team word alone is a point`() {
+        assertEquals(
+            Verdict.Accepted(ScoreCommand.TeamPoint(Team.BLUE)),
+            CommandParser.parse(heard("blau" to 1.0), teamOnly, 0.85)!!.verdict,
+        )
+        assertEquals(
+            Verdict.Accepted(ScoreCommand.TeamPoint(Team.RED)),
+            CommandParser.parse(heard("[unk]" to 1.0, "rot" to 0.9, "[unk]" to 1.0), teamOnly, 0.85)!!.verdict,
+        )
+    }
+
+    @Test
+    fun `without a point word the old two word command still scores once`() {
+        // "punkt" is a decoy then; "blau" is the command.
+        assertEquals(
+            Verdict.Accepted(ScoreCommand.TeamPoint(Team.BLUE)),
+            CommandParser.parse(heard("punkt" to 1.0, "blau" to 1.0), teamOnly, 0.85)!!.verdict,
+        )
+        assertEquals(
+            Verdict.Accepted(ScoreCommand.TeamPoint(Team.BLUE)),
+            CommandParser.parse(heard("blau" to 1.0, "blau" to 1.0), teamOnly, 0.85)!!.verdict,
+        )
+    }
+
+    @Test
+    fun `without a point word both teams in one result give nothing`() {
+        assertEquals(
+            Verdict.Rejected(RejectReason.MULTIPLE),
+            CommandParser.parse(heard("blau" to 1.0, "rot" to 1.0), teamOnly, 0.85)!!.verdict,
+        )
+    }
+
+    @Test
+    fun `without a point word confidence and the talk before it still count`() {
+        assertEquals(
+            Verdict.Rejected(RejectReason.LOW_CONFIDENCE),
+            CommandParser.parse(heard("blau" to 0.5), teamOnly, 0.85)!!.verdict,
+        )
+        assertEquals(
+            Verdict.Rejected(RejectReason.IN_SPEECH),
+            CommandParser.parse(
+                heard("der" to 1.0, "ball" to 1.0, "war" to 1.0, "nicht" to 1.0, "im" to 1.0, "blau" to 1.0), teamOnly, 0.85,
+            )!!.verdict,
+        )
+    }
+
+    @Test
+    fun `without a point word the grammar has the team words alone and no pairs`() {
+        val grammar = CommandParser.grammar(teamOnly, halves = false)
+        assertTrue("blau" in grammar && "rot" in grammar && "zurück" in grammar)
+        assertTrue("punkt" in grammar) // as a decoy
+        assertTrue(grammar.none { it == "punkt blau" || it == "blau punkt" })
+    }
+
+    @Test
+    fun `with a point word a team word alone is still no command`() {
+        assertEquals(
+            Verdict.Rejected(RejectReason.UNKNOWN),
+            CommandParser.parse(heard("blau" to 1.0), CommandWords.defaults(Language.DE), 0.85)!!.verdict,
+        )
+    }
 }
