@@ -682,3 +682,29 @@ alone ("Blau", "Rot", or the user's team words) scores the point.
   same team twice counts once, both teams in one result give nothing, echo guard, tap lock.
 - Expected cost: more false points, since a single colour word turns up in ordinary talk.
   Not measured; only unit tests were run for this version.
+
+## 3.5.0 — minimum confidence as a slider (added 2026-11-23)
+
+Court report: the correct phrase was shown many times but rejected as "unsure" even at
+Relaxed (0.70). The threshold becomes a number the user tunes against the heard line.
+
+### Setting
+
+- "Voice sensitivity" (three levels) becomes **"Minimum confidence" / "Mindest-Sicherheit"**,
+  a slider from **0.30 to 0.95 in steps of 0.05**, showing the value ("0.55"). A legend line
+  keeps the old levels recognisable: Strict 0.95 · Normal 0.85 · Relaxed 0.70. Hint: lower
+  accepts more commands and gives more false points; compare with the number next to a
+  rejected command in the heard line.
+- Default 0.85. Stored as whole hundredths (`voice_min_confidence_pct`), so 0.85 is exactly
+  0.85; values read from disk are clamped to the range and snapped to the step.
+- Migration: without a stored number, the old `voice_sensitivity` level gives STRICT 0.95,
+  NORMAL 0.85, RELAXED 0.70 — nobody's behaviour changes on update.
+- Applies wherever the threshold applied (parser, joined halves, one-word mode); a change
+  restarts the recogniser (the model stays loaded). The slider saves when released.
+
+### Heard line
+
+- A rejection by the threshold reads "✗ unsure: below 0.70" / "✗ unsicher: unter 0.70",
+  next to the command's own confidence, so the gap is visible at a glance.
+- A result without per-word scores (Vosk word list missing or not matching the text) was also
+  shown as "unsure"; it now has its own reason, "no word scores" / "keine Wortwerte".
