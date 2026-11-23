@@ -43,6 +43,13 @@ object VoiceThreshold {
         VoiceSensitivity.entries.firstOrNull { it.name == name }?.let { Math.round(it.minConfidence * 100).toInt() }
 
     fun label(pct: Int): String = String.format(java.util.Locale.ROOT, "%.2f", toConfidence(pct))
+
+    /**
+     * A heard word's confidence for the heard line, cut to two decimals: 0.698 reads "0.69",
+     * so a word rejected below 0.70 never reads "0.70" (the comparison uses the raw value).
+     */
+    fun shown(confidence: Double): String =
+        String.format(java.util.Locale.ROOT, "%.2f", Math.floor(confidence * 100 + 1e-6) / 100)
 }
 
 /** Why a heard phrase did not score. */

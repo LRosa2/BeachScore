@@ -50,6 +50,15 @@ class VoiceThresholdTest {
     }
 
     @Test
+    fun `a heard confidence is cut, not rounded, so a rejection never reads as the threshold`() {
+        assertEquals("0.69", VoiceThreshold.shown(0.698))
+        assertEquals("0.70", VoiceThreshold.shown(0.70))
+        assertEquals("0.62", VoiceThreshold.shown(0.62))
+        assertEquals("1.00", VoiceThreshold.shown(1.0))
+        assertEquals("0.00", VoiceThreshold.shown(0.0))
+    }
+
+    @Test
     fun `the label shows two decimals`() {
         assertEquals("0.55", VoiceThreshold.label(55))
         assertEquals("0.30", VoiceThreshold.label(30))

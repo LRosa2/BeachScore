@@ -100,7 +100,7 @@ private fun HeardText(heard: Heard, minConfidencePct: Int) {
             Triple("✗", Rejected, stringResource(R.string.reason_low_confidence, VoiceThreshold.label(minConfidencePct)))
         else -> Triple("✗", Rejected, stringResource(reasonText((verdict as Verdict.Rejected).reason)))
     }
-    val confidence = heard.minConfidence?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "–"
+    val confidence = heard.minConfidence?.let { VoiceThreshold.shown(it) } ?: "–"
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("heard_line")) {
         Text("“${heard.display}”", color = Color.White, fontSize = 15.sp)
         Text(confidence, color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp)

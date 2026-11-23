@@ -737,3 +737,11 @@ words, so it counts every sentence for blau/rot and only mis-hearings for the ot
   (more than 4 words of talk before the word), by design.
 - Below about 0.60 nothing more is gained on this synthetic audio; real voices score lower
   (court report), which is what the slider is for.
+
+Per word (right team, 0.85 / 0.50; quiet of 6, noisy of 9): Blau 6/6, 8/9 — Rot 2/6, 0/9 ·
+Himmel 6/6, 5/9 — Feuer 5/6, 8/9 (9/9 at 0.50) · Ozean 5/6, 9/9 — Vulkan 5/6, 9/9 ·
+Delfin 6/6, 4/9 (6/9) — Tiger 6/6, 5/9 (6/9) · blue 5/6, 0/9 (6/6, 3/9) — red 6/6, 9/9 ·
+ocean 5/6, 8/9 — volcano 6/6, 9/9. Himmel is weak under the noise bed (all three voices);
+ozean/vulkan's chatter triggers all come from "zählen" heard as "ozean". Three voices per
+word only. The heard line now cuts the confidence to two decimals (0.698 reads 0.69), so a
+rejected word never shows the threshold's own number.
