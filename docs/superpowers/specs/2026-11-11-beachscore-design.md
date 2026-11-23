@@ -708,3 +708,32 @@ Relaxed (0.70). The threshold becomes a number the user tunes against the heard 
   next to the command's own confidence, so the gap is visible at a glance.
 - A result without per-word scores (Vosk word list missing or not matching the text) was also
   shown as "unsure"; it now has its own reason, "no word scores" / "keine Wortwerte".
+
+### One-word team words (VoiceSpottingTest.oneWordTeamWords, emulator, 2026-11-23)
+
+One-word mode (point field empty, 3.4.1). Each word said alone, three TTS voices. "Quiet" is
+silence or neutral sentences around the word (12 runs per pair), "noisy" is noise bursts,
+the noise bed, and speech plus bed (18). Chatter: 36 streams × with/without bed (72).
+Tabulated from one run at 0.30 (a command accepted at 0.30 with confidence c is accepted at T
+exactly when c ≥ T).
+
+| pair (blue/red)  | quiet 0.85 | noisy 0.85 | noisy 0.50 | wrong | chatter 0.85 / 0.50 | right word's confidence |
+|------------------|------------|------------|------------|-------|---------------------|-------------------------|
+| blau/rot         | 8 of 12    | 8 of 18    | 8 of 18    | 0     | 22 / 24 *           | min 0.87 (16 of 30)     |
+| himmel/feuer     | 11 of 12   | 13 of 18   | 14 of 18   | 0     | 0 / 0 *             | min 0.64 (25 of 30)     |
+| ozean/vulkan     | 10 of 12   | 18 of 18   | 18 of 18   | 0     | 5 / 6               | min 1.00 (28 of 30)     |
+| delfin/tiger     | 12 of 12   | 9 of 18    | 12 of 18   | 1     | 2 / 3               | min 0.63 (25 of 30)     |
+| EN blue/red      | 11 of 12   | 9 of 18    | 12 of 18   | 0     | 42 / 43 *           | min 0.63 (24 of 30)     |
+| EN ocean/volcano | 11 of 12   | 17 of 18   | 17 of 18   | 0     | 1 / 1               | min 0.60 (29 of 30)     |
+
+\* The chatter is full of "Blau/Rot"/"blue/red" by design and contains none of the other
+words, so it counts every sentence for blau/rot and only mis-hearings for the others.
+
+- A lone "Rot" is heard as "Brot" or "wo" (2 of 15): a recognition miss (shown as
+  "unknown"), not a threshold problem — lowering the threshold does not help.
+- "Punkte zählen" is heard as "punkte ozean": ozean/vulkan recognises best but scores in
+  chatter. Himmel/feuer had no chatter trigger and no wrong point.
+- Misses after a long neutral sentence ("Weiter so, gut gemacht …") are the in-speech rule
+  (more than 4 words of talk before the word), by design.
+- Below about 0.60 nothing more is gained on this synthetic audio; real voices score lower
+  (court report), which is what the slider is for.
