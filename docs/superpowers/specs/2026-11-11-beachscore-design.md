@@ -745,3 +745,8 @@ ocean 5/6, 8/9 — volcano 6/6, 9/9. Himmel is weak under the noise bed (all thr
 ozean/vulkan's chatter triggers all come from "zählen" heard as "ozean". Three voices per
 word only. The heard line now cuts the confidence to two decimals (0.698 reads 0.69), so a
 rejected word never shows the threshold's own number.
+
+Not yet measured (emulator closed mid-run): English sky/fire and dolphin/tiger, and English
+"point blue" confidence with the 3.3.1 grammar (single words as entries) against pairs only
+(`englishCommandConfidenceWithAndWithoutSingleWords`). Run with
+`-e oneWordLanguages en -e class …VoiceSpottingTest#oneWordTeamWords,…#englishCommandConfidenceWithAndWithoutSingleWords`.
