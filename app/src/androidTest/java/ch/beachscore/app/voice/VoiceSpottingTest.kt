@@ -384,6 +384,74 @@ class VoiceSpottingTest {
         summary.forEach { line("# $it") }
     }
 
+    /**
+     * 3.5.0: one-word mode (3.4.1, point field empty): a team word alone scores. Which pair of
+     * words is reliable said alone? Each word of each pair (three TTS voices) in quiet, between
+     * noise bursts, between neutral sentences and under the noise bed; and the chatter streams.
+     *
+     * Every run is done once at the lowest threshold (0.30) and tabulated for higher ones: the
+     * threshold only decides LOW_CONFIDENCE, so a command accepted at 0.30 with confidence c is
+     * accepted at T exactly when c >= T. Measurement only: nothing is asserted.
+     *
+     * Bias: the chatter (and the babble of the noise bed) is full of "Blau"/"Rot" by design and
+     * contains none of the other candidates, so blau/rot get every chatter sentence as a trigger
+     * and the others only mis-hearings.
+     */
+    @Test
+    fun oneWordTeamWords() {
+        val floor = VoiceThreshold.toConfidence(VoiceThreshold.MIN_PCT)
+        val thresholds = listOf(0.85, 0.70, 0.60, 0.50, 0.40)
+        val summary = mutableListOf<String>()
+        for ((language, pair) in ONE_WORD_PAIRS) {
+            val (blue, red) = pair
+            val model = models.getValue(language)
+            val missing = listOf(blue, red).filterNot { VoskVocabulary.knows(model, it) }
+            if (missing.isNotEmpty()) {
+                summary += "${language.tag} $blue/$red: not in the model: $missing (skipped)"
+                continue
+            }
+            val words = CommandWords.of(language, CustomWords(blue = listOf(blue), red = listOf(red), pointOff = true))
+            val clips = oneWordClips.filter { it.language == language && it.name.substringAfterLast("__") in setOf(blue, red) }
+            // Per threshold: [quiet hits, quiet n, noisy hits, noisy n, wrong].
+            val counts = thresholds.associateWith { IntArray(5) }
+            val confidences = mutableListOf<Double>()
+            for (clip in clips) for (condition in listOf("quiet") + CONDITIONS) {
+                val pcm = if (condition == "quiet") ShortArray(RATE / 2) + clip.pcm + ShortArray(RATE * 5 / 2) else place(clip, condition).first
+                val run = run(words, pcm, VoiceSensitivity.NORMAL, threshold = floor)
+                val scored = run.heard.mapNotNull { h -> (h.verdict as? Verdict.Accepted)?.let { it.command to (h.minConfidence ?: 0.0) } }
+                scored.filter { it.first == clip.expected }.maxOfOrNull { it.second }?.let { confidences += it }
+                val quiet = condition == "quiet" || condition == "speech_around"
+                for (t in thresholds) {
+                    val at = scored.filter { it.second >= t }.map { it.first }
+                    val c = counts.getValue(t)
+                    val hit = at.isNotEmpty() && at.all { it == clip.expected }
+                    if (quiet) { c[1]++; if (hit) c[0]++ } else { c[3]++; if (hit) c[2]++ }
+                    if (at.any { it != clip.expected }) c[4]++
+                }
+                line("oneword-${language.tag}-$blue/$red\t$condition\t${clip.name}\t${describe(run.heard)}")
+            }
+            val chatter = thresholds.associateWith { 0 }.toMutableMap()
+            var streams = 0
+            for (stream in chatterStreams.filter { it.language == language }) for (bed in listOf(false, true)) {
+                val pcm = if (bed) withBed(stream.pcm, stream.language, stream.name.hashCode().toLong()) else stream.pcm
+                val run = run(words, pcm + ShortArray(RATE), VoiceSensitivity.NORMAL, threshold = floor)
+                streams++
+                val conf = run.heard.filter { it.verdict is Verdict.Accepted }.maxOfOrNull { it.minConfidence ?: 0.0 }
+                for (t in thresholds) if (conf != null && conf >= t) chatter[t] = chatter.getValue(t) + 1
+                if (conf != null) line("oneword-chatter-${language.tag}-$blue/$red\t${stream.name}\t$bed\t${describe(run.heard)}")
+            }
+            val sorted = confidences.sorted()
+            val spread = if (sorted.isEmpty()) "-" else
+                "min %.2f, 10%% %.2f, median %.2f".format(Locale.ROOT, sorted.first(), sorted[sorted.size / 10], sorted[sorted.size / 2])
+            for (t in thresholds) {
+                val c = counts.getValue(t)
+                summary += "${language.tag} $blue/$red at %.2f: quiet ${c[0]} of ${c[1]}, noisy ${c[2]} of ${c[3]}, wrong ${c[4]}, chatter ${chatter[t]} of $streams".format(Locale.ROOT, t)
+            }
+            summary += "${language.tag} $blue/$red: confidence of the right word when heard: $spread (${sorted.size} of ${clips.size * (CONDITIONS.size + 1)} runs)"
+        }
+        summary.forEach { line("# $it") }
+    }
+
     @Test
     fun theModelVocabularyIsReadable() {
         val de = models.getValue(Language.DE)
@@ -404,11 +472,12 @@ class VoiceSpottingTest {
         sensitivity: VoiceSensitivity,
         maxPauseMs: Long? = HalfJoiner.DEFAULT_PAUSE_MS,
         longEndpointer: Boolean = true,
+        threshold: Double = sensitivity.minConfidence,
     ): Run {
         val accepted = mutableListOf<ScoreCommand>()
         val heard = mutableListOf<Heard>()
         val at = mutableListOf<Int>()
-        CommandRecognizer(models.getValue(words.language), words, sensitivity.minConfidence, maxPauseMs = maxPauseMs, longEndpointer = longEndpointer).use { rec ->
+        CommandRecognizer(models.getValue(words.language), words, threshold, maxPauseMs = maxPauseMs, longEndpointer = longEndpointer).use { rec ->
             val chunk = RATE / 10
             var i = 0
             fun take(h: Heard?, pos: Int) {
@@ -500,6 +569,14 @@ class VoiceSpottingTest {
             "point_blue" to "Himmel Treffer", "point_red" to "Feuer Treffer",
         )
 
+        /** 3.5.0: candidate team words for one-word mode (blue, red); the first pair is the default. */
+        private val ONE_WORD_PAIRS = listOf(
+            Language.DE to ("blau" to "rot"), Language.DE to ("himmel" to "feuer"),
+            Language.DE to ("ozean" to "vulkan"), Language.DE to ("delfin" to "tiger"),
+            Language.EN to ("blue" to "red"), Language.EN to ("ocean" to "volcano"),
+        )
+        private val oneWordClips = mutableListOf<Clip>()
+
         private val models = mutableMapOf<Language, Model>()
         private val commands = mutableListOf<Clip>()
         private val customCommands = mutableListOf<Clip>()
@@ -587,6 +664,10 @@ class VoiceSpottingTest {
             EN_COMMANDS.forEach { texts += Triple(Language.EN, "cmd:" + it.first, it.second) }
             DE_HALVES.forEach { texts += Triple(Language.DE, "half:" + it.first, it.second) }
             EN_HALVES.forEach { texts += Triple(Language.EN, "half:" + it.first, it.second) }
+            for ((language, pair) in ONE_WORD_PAIRS) {
+                texts += Triple(language, "one:point_blue:" + pair.first, pair.first.replaceFirstChar { it.uppercase() })
+                texts += Triple(language, "one:point_red:" + pair.second, pair.second.replaceFirstChar { it.uppercase() })
+            }
             DE_NEUTRAL.forEach { texts += Triple(Language.DE, "neutral", it) }
             EN_NEUTRAL.forEach { texts += Triple(Language.EN, "neutral", it) }
             (DE_CHATTER + DE_UNDO_CHATTER).forEach { texts += Triple(Language.DE, "chatter", it) }
@@ -602,6 +683,10 @@ class VoiceSpottingTest {
                     val slug = text.lowercase().replace(Regex("[^a-zäöüß]+"), "_").trim('_')
                     when {
                         kind.startsWith("half:") -> halves[Triple(language, v, kind.removePrefix("half:"))] = clip
+                        kind.startsWith("one:") -> {
+                            val (_, expected, word) = kind.split(":")
+                            oneWordClips += Clip("${language.tag}__tts${v}__$word", language, command(expected), clip)
+                        }
                         kind.startsWith("variant:") ->
                             variantCommands += Clip("${language.tag}__tts${v}__$slug", language, command(kind.removePrefix("variant:")), clip)
                         kind.startsWith("custom:") ->
