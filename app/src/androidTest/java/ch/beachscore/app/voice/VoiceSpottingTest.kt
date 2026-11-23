@@ -402,7 +402,7 @@ class VoiceSpottingTest {
         val floor = VoiceThreshold.toConfidence(VoiceThreshold.MIN_PCT)
         val thresholds = listOf(0.85, 0.70, 0.60, 0.50, 0.40)
         val summary = mutableListOf<String>()
-        for ((language, pair) in ONE_WORD_PAIRS.filter { it.first in measuredLanguages() }) {
+        for ((language, pair) in ONE_WORD_PAIRS.filter { it.first in measuredLanguages() && measuredPairs().let { only -> only == null || it.second.first in only } }) {
             val (blue, red) = pair
             val model = models.getValue(language)
             val missing = listOf(blue, red).filterNot { VoskVocabulary.knows(model, it) }
@@ -611,6 +611,10 @@ class VoiceSpottingTest {
             Language.EN to ("blue" to "red"), Language.EN to ("ocean" to "volcano"),
             Language.EN to ("sky" to "fire"), Language.EN to ("dolphin" to "tiger"),
         )
+
+        /** `-e oneWordPairs sky,dolphin` limits [oneWordTeamWords] to pairs with those blue words. */
+        private fun measuredPairs(): Set<String>? =
+            InstrumentationRegistry.getArguments().getString("oneWordPairs")?.split(',')?.map { it.trim() }?.toSet()
 
         /** `-e oneWordLanguages en` limits [oneWordTeamWords] to those languages (default: all). */
         private fun measuredLanguages(): Set<Language> =
