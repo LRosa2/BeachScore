@@ -97,6 +97,13 @@ class VoiceInput(
     /** One loaded model at a time (the active language); kept across stop/start for a quick resume. */
     private var loaded: Pair<Language, Model>? = null
 
+    /**
+     * Guards [loaded] only. Not `this`: loading takes seconds, and [start]/[stop] (main thread)
+     * must never wait for it (3.5.1, an app freeze / ANR while the model loaded). Listens stay in
+     * order anyway: each one joins the previous job before it loads.
+     */
+    private val modelLock = Any()
+
     init {
         LibVosk.setLogLevel(LogLevel.WARNINGS)
         audioManager.registerAudioDeviceCallback(
@@ -134,8 +141,8 @@ class VoiceInput(
     @Synchronized
     override fun stop() {
         config = null
+        // Kept (cancelled), so the next start() joins it: never two listens, models or microphones at once.
         job?.cancel()
-        job = null
         _status.value = VoiceStatus.Off
         _active.value = null
     }
@@ -259,12 +266,11 @@ class VoiceInput(
         _active.value = routed
     }
 
-    @Synchronized
-    private fun loadModel(language: Language): Model {
+    private fun loadModel(language: Language): Model = synchronized(modelLock) {
         loaded?.let { (lang, model) -> if (lang == language) return model else model.close() }
         loaded = null
         val dir = modelStore.ensure(language) { progress -> _status.value = VoiceStatus.Preparing(progress) }
-        return Model(dir.absolutePath).also { loaded = language to it }
+        Model(dir.absolutePath).also { loaded = language to it }
     }
 
     private fun inputs(): List<InputDevice> =

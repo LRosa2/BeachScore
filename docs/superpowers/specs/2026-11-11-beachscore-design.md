@@ -750,3 +750,14 @@ Not yet measured (emulator closed mid-run): English sky/fire and dolphin/tiger, 
 "point blue" confidence with the 3.3.1 grammar (single words as entries) against pairs only
 (`englishCommandConfidenceWithAndWithoutSingleWords`). Run with
 `-e oneWordLanguages en -e class …VoiceSpottingTest#oneWordTeamWords,…#englishCommandConfidenceWithAndWithoutSingleWords`.
+
+## 3.5.1 — no freeze while the speech model loads (added 2026-11-23)
+
+The app could freeze, up to an "isn't responding" dialog, while the speech model loaded.
+`VoiceInput.loadModel` (background, seconds) and `start()`/`stop()` (main thread: app to the
+background and back, opening History or Statistics, changing a voice setting) shared one lock,
+so the main thread waited for the whole load. The model now has a lock of its own; `start()`
+and `stop()` only swap the listening job. Order is unchanged: a new listen joins the previous
+job before it loads, so two loads never overlap and a model in use is never closed under a
+recognizer. Not unit-testable (Vosk native code); checked on the emulator by switching screens
+during the load.
