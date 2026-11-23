@@ -30,8 +30,8 @@ android {
         applicationId = "ch.beachscore.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "3.4.1"
+        versionCode = 10
+        versionName = "3.5.0"
         // Shown in About: the build date (ISO), formatted by the app for its language.
         buildConfigField("String", "RELEASE_DATE", "\"${LocalDate.now()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
