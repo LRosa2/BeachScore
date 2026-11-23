@@ -402,7 +402,7 @@ class VoiceSpottingTest {
         val floor = VoiceThreshold.toConfidence(VoiceThreshold.MIN_PCT)
         val thresholds = listOf(0.85, 0.70, 0.60, 0.50, 0.40)
         val summary = mutableListOf<String>()
-        for ((language, pair) in ONE_WORD_PAIRS) {
+        for ((language, pair) in ONE_WORD_PAIRS.filter { it.first in measuredLanguages() }) {
             val (blue, red) = pair
             val model = models.getValue(language)
             val missing = listOf(blue, red).filterNot { VoskVocabulary.knows(model, it) }
@@ -448,6 +448,41 @@ class VoiceSpottingTest {
                 summary += "${language.tag} $blue/$red at %.2f: quiet ${c[0]} of ${c[1]}, noisy ${c[2]} of ${c[3]}, wrong ${c[4]}, chatter ${chatter[t]} of $streams".format(Locale.ROOT, t)
             }
             summary += "${language.tag} $blue/$red: confidence of the right word when heard: $spread (${sorted.size} of ${clips.size * (CONDITIONS.size + 1)} runs)"
+        }
+        summary.forEach { line("# $it") }
+    }
+
+    /**
+     * 3.5.0, court report: a clearly spoken English "point blue" shown but rejected as unsure.
+     * The confidence of the command words with the 3.3.1 grammar (single point and team words
+     * as entries of their own, for joining halves) against the 3.3.0 grammar (pairs only), on
+     * the same audio: TTS voices and the SAPI fixtures, quiet and in every condition. One run
+     * each at 0.30, tabulated. Measurement only.
+     */
+    @Test
+    fun englishCommandConfidenceWithAndWithoutSingleWords() {
+        val floor = VoiceThreshold.toConfidence(VoiceThreshold.MIN_PCT)
+        val points = commands.filter { it.language == Language.EN && it.expected is ScoreCommand.TeamPoint }
+        val summary = mutableListOf<String>()
+        for ((label, pause) in listOf("3.3.1+ singles" to HalfJoiner.DEFAULT_PAUSE_MS, "3.3.0 pairs only" to null)) {
+            val confs = mutableListOf<Double>()
+            var n = 0
+            var wrong = 0
+            for (clip in points) for (condition in listOf("quiet") + CONDITIONS) {
+                val pcm = if (condition == "quiet") ShortArray(RATE / 2) + clip.pcm + ShortArray(RATE * 5 / 2) else place(clip, condition).first
+                val run = run(CommandWords.defaults(Language.EN), pcm, VoiceSensitivity.NORMAL, pause, threshold = floor)
+                n++
+                val scored = run.heard.mapNotNull { h -> (h.verdict as? Verdict.Accepted)?.let { it.command to (h.minConfidence ?: 0.0) } }
+                if (scored.any { it.first != clip.expected }) wrong++
+                val c = scored.filter { it.first == clip.expected }.maxOfOrNull { it.second }
+                if (c != null) confs += c
+                if (c == null || c < 0.70) line("en-conf-$label\t$condition\t${clip.name}\t${describe(run.heard)}")
+            }
+            val sorted = confs.sorted()
+            fun atLeast(t: Double) = confs.count { it >= t }
+            summary += "EN point commands, $label: of $n runs heard right ${confs.size}; at 0.85 ${atLeast(0.85)}, 0.70 ${atLeast(0.70)}, " +
+                "0.60 ${atLeast(0.60)}, 0.50 ${atLeast(0.50)}; wrong $wrong; confidence " +
+                (if (sorted.isEmpty()) "-" else "min %.2f, 10%% %.2f, median %.2f".format(Locale.ROOT, sorted.first(), sorted[sorted.size / 10], sorted[sorted.size / 2]))
         }
         summary.forEach { line("# $it") }
     }
@@ -574,7 +609,13 @@ class VoiceSpottingTest {
             Language.DE to ("blau" to "rot"), Language.DE to ("himmel" to "feuer"),
             Language.DE to ("ozean" to "vulkan"), Language.DE to ("delfin" to "tiger"),
             Language.EN to ("blue" to "red"), Language.EN to ("ocean" to "volcano"),
+            Language.EN to ("sky" to "fire"), Language.EN to ("dolphin" to "tiger"),
         )
+
+        /** `-e oneWordLanguages en` limits [oneWordTeamWords] to those languages (default: all). */
+        private fun measuredLanguages(): Set<Language> =
+            InstrumentationRegistry.getArguments().getString("oneWordLanguages")
+                ?.split(',')?.mapNotNull { Language.fromTag(it.trim()) }?.toSet() ?: Language.entries.toSet()
         private val oneWordClips = mutableListOf<Clip>()
 
         private val models = mutableMapOf<Language, Model>()
