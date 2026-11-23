@@ -725,6 +725,8 @@ exactly when c ≥ T).
 | delfin/tiger     | 12 of 12   | 9 of 18    | 12 of 18   | 1     | 2 / 3               | min 0.63 (25 of 30)     |
 | EN blue/red      | 11 of 12   | 9 of 18    | 12 of 18   | 0     | 42 / 43 *           | min 0.63 (24 of 30)     |
 | EN ocean/volcano | 11 of 12   | 17 of 18   | 17 of 18   | 0     | 1 / 1               | min 0.60 (29 of 30)     |
+| EN sky/fire      | 12 of 12   | 15 of 18   | 17 of 18   | 0     | 1 / 1               | min 0.65 (29 of 30)     |
+| EN dolphin/tiger | 12 of 12   | 18 of 18   | 18 of 18   | 0     | 0 / 0               | min 1.00 (30 of 30)     |
 
 \* The chatter is full of "Blau/Rot"/"blue/red" by design and contains none of the other
 words, so it counts every sentence for blau/rot and only mis-hearings for the others.
@@ -746,10 +748,18 @@ ozean/vulkan's chatter triggers all come from "zählen" heard as "ozean". Three 
 word only. The heard line now cuts the confidence to two decimals (0.698 reads 0.69), so a
 rejected word never shows the threshold's own number.
 
-Not yet measured (emulator closed mid-run): English sky/fire and dolphin/tiger, and English
-"point blue" confidence with the 3.3.1 grammar (single words as entries) against pairs only
-(`englishCommandConfidenceWithAndWithoutSingleWords`). Run with
-`-e oneWordLanguages en -e class …VoiceSpottingTest#oneWordTeamWords,…#englishCommandConfidenceWithAndWithoutSingleWords`.
+English one-word choice: dolphin/tiger is the clear best (every run heard at confidence 1.00,
+no chatter, no wrong point); sky/fire is next (its one chatter trigger is "fire" inside a
+sentence). blue/red is the worst: "blue" alone is hardly heard under noise.
+
+English "point blue|red" confidence, 3.3.1 grammar (single words as entries) against 3.3.0
+(pairs only), same 120 runs (point commands × quiet and every condition): heard right 117
+both; at 0.85 114 against 115, at 0.70 116 both; one wrong (a "blue" heard as "red" in speech
+plus bed) both; median 1.00. The single-word entries do not lower the confidence. A clear
+"point blue" below 0.70 on court is therefore not reproduced on synthetic audio: it is the
+real voice, the distance and the wind against the small English model, where "blue" is the
+weaker word and a command takes the lower of its two words. Run with
+`-e oneWordLanguages en -e oneWordPairs sky,dolphin -e class …VoiceSpottingTest#oneWordTeamWords,…#englishCommandConfidenceWithAndWithoutSingleWords`.
 
 ## 3.5.1 — no freeze while the speech model loads (added 2026-11-23)
 
