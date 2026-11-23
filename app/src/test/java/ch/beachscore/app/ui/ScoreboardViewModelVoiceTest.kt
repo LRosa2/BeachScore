@@ -22,7 +22,6 @@ import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.MicKind
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
-import ch.beachscore.app.voice.VoiceSensitivity
 import ch.beachscore.app.voice.WordField
 import ch.beachscore.app.voice.WordProblem
 import kotlinx.coroutines.Dispatchers
@@ -182,7 +181,7 @@ class ScoreboardViewModelVoiceTest {
         settingsStore.update { it.copy(voicePauseMs = 3000L) }
         assertEquals(3000L, voice.maxPauseMs)
         assertEquals(starts + 1, voice.startCount)
-        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening, "still listening")
+        assertEquals(Language.EN to 0.85, voice.listening, "still listening")
     }
 
     @Test
@@ -207,7 +206,7 @@ class ScoreboardViewModelVoiceTest {
         val vm = viewModel(foreground = false)
         assertNull(voice.listening, "background")
         vm.onForegroundChanged(true)
-        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+        assertEquals(Language.EN to 0.85, voice.listening)
         vm.onForegroundChanged(false)
         assertNull(voice.listening, "stops in the background")
         vm.onForegroundChanged(true)
@@ -237,17 +236,17 @@ class ScoreboardViewModelVoiceTest {
         vm.onMicPermissionResult(granted = true)
         assertEquals(true, vm.ui.settings.voiceCommands)
         assertEquals(false, vm.ui.voicePermissionDenied)
-        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+        assertEquals(Language.EN to 0.85, voice.listening)
     }
 
     @Test
     fun `listening pauses while history or statistics cover the scoreboard`() = runTest {
         val vm = viewModel()
-        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+        assertEquals(Language.EN to 0.85, voice.listening)
         vm.onScoreboardVisible(false)
         assertNull(voice.listening)
         vm.onScoreboardVisible(true)
-        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening)
+        assertEquals(Language.EN to 0.85, voice.listening)
     }
 
     @Test
@@ -262,10 +261,16 @@ class ScoreboardViewModelVoiceTest {
     fun `recognition follows the app language and sensitivity`() = runTest {
         val vm = viewModel()
         settingsStore.update { it.copy(language = Language.DE) }
-        assertEquals(Language.DE to VoiceSensitivity.NORMAL, voice.listening)
-        settingsStore.update { it.copy(voiceSensitivity = VoiceSensitivity.STRICT) }
-        assertEquals(Language.DE to VoiceSensitivity.STRICT, voice.listening)
-        assertEquals(VoiceSensitivity.STRICT, vm.ui.settings.voiceSensitivity)
+        assertEquals(Language.DE to 0.85, voice.listening)
+        settingsStore.update { it.copy(voiceMinConfidencePct = 95) }
+        assertEquals(Language.DE to 0.95, voice.listening)
+        assertEquals(95, vm.ui.settings.voiceMinConfidencePct)
+        // 3.5.0: below the old "Relaxed", applied without a restart of the app.
+        settingsStore.update { it.copy(voiceMinConfidencePct = 45) }
+        assertEquals(Language.DE to 0.45, voice.listening)
+        // Out-of-range values are brought back to the slider's range and step.
+        settingsStore.update { it.copy(voiceMinConfidencePct = 12) }
+        assertEquals(Language.DE to 0.30, voice.listening)
     }
 
     @Test
@@ -281,7 +286,7 @@ class ScoreboardViewModelVoiceTest {
         val receiver = MicChoice(MicKind.USB, "Wireless Mic Rx")
         settingsStore.update { it.copy(microphone = receiver) }
         assertEquals(receiver, voice.microphone)
-        assertEquals(Language.EN to VoiceSensitivity.NORMAL, voice.listening, "still listening")
+        assertEquals(Language.EN to 0.85, voice.listening, "still listening")
         settingsStore.update { it.copy(microphone = null) }
         assertNull(voice.microphone)
     }

@@ -21,7 +21,6 @@ import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.CommandWords
 import ch.beachscore.app.voice.VoiceControl
-import ch.beachscore.app.voice.VoiceSensitivity
 import ch.beachscore.app.voice.VoiceStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -73,7 +72,8 @@ class FakeVoice : VoiceControl {
     override val status = MutableStateFlow<VoiceStatus>(VoiceStatus.Off)
 
     /** Last start() arguments while listening, null while stopped. */
-    var listening: Pair<Language, VoiceSensitivity>? = null
+    /** Language and minimum confidence while listening. */
+    var listening: Pair<Language, Double>? = null
         private set
     var startCount = 0
         private set
@@ -94,10 +94,10 @@ class FakeVoice : VoiceControl {
     var maxPauseMs: Long? = null
         private set
 
-    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords, maxPauseMs: Long) {
-        if (listening == language to sensitivity && this.microphone == microphone && this.words == words && this.maxPauseMs == maxPauseMs) return
-        if (listening != language to sensitivity || this.words != words || this.maxPauseMs != maxPauseMs) startCount++
-        listening = language to sensitivity
+    override fun start(language: Language, minConfidence: Double, microphone: MicChoice?, words: CommandWords, maxPauseMs: Long) {
+        if (listening == language to minConfidence && this.microphone == microphone && this.words == words && this.maxPauseMs == maxPauseMs) return
+        if (listening != language to minConfidence || this.words != words || this.maxPauseMs != maxPauseMs) startCount++
+        listening = language to minConfidence
         this.microphone = microphone
         this.words = words
         this.maxPauseMs = maxPauseMs

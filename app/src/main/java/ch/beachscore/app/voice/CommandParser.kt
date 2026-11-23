@@ -149,7 +149,7 @@ object CommandParser {
         val best = if (confidences == null) matches.first() else matches.maxBy { m -> (m.first..m.last).minOf { confidences[it] } }
         val spotted = tokens.subList(best.first, best.last + 1).joinToString(" ")
         val display = (if (best.first > 0) "… " else "") + spotted + (if (best.last < tokens.size - 1) " …" else "")
-        if (confidences == null) return Heard(text, allMin, Verdict.Rejected(RejectReason.LOW_CONFIDENCE), display)
+        if (confidences == null) return Heard(text, allMin, Verdict.Rejected(RejectReason.NO_WORD_SCORES), display)
         val confidence = (best.first..best.last).minOf { confidences[it] }
         val covered = matches.flatMap { it.first..it.last }.toSet()
         fun talk(range: IntRange) = range.count { it !in covered && tokens[it] != UNKNOWN_WORD }

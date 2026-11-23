@@ -60,11 +60,9 @@
     <string name="voice_commands">Sprachbefehle</string>
     <string name="voice_commands_hint">„Punkt Blau“, „Punkt Rot“ oder „zurück“ sagen. Hört nur zu, solange die Anzeige offen ist.</string>
     <string name="voice_permission_denied">Sprachbefehle brauchen das Mikrofon und bleiben deshalb aus. Zum Verwenden das Mikrofon für BeachScore erlauben und wieder einschalten.</string>
-    <string name="voice_sensitivity">Empfindlichkeit</string>
-    <string name="voice_sensitivity_strict">Streng</string>
-    <string name="voice_sensitivity_normal">Normal</string>
-    <string name="voice_sensitivity_relaxed">Locker</string>
-    <string name="voice_sensitivity_hint">Streng: weniger falsche Punkte. Locker: nimmt auch undeutlichere Befehle aus grösserer Entfernung an.</string>
+    <string name="min_confidence">Mindest-Sicherheit: %1$s</string>
+    <string name="min_confidence_legend">Streng %1$s · Normal %2$s · Locker %3$s</string>
+    <string name="min_confidence_hint">Tiefer nimmt mehr Befehle an, gibt aber auch mehr falsche Punkte. Vergleichen mit der Zahl neben einem abgelehnten Befehl in der Gehört-Zeile.</string>
     <string name="voice_pause">Pause zwischen den Wörtern</string>
     <string name="voice_pause_seconds">%1$d s</string>
     <string name="voice_pause_hint">Längste Pause zwischen „Punkt“ und dem Team, z. B. „Punkt … Blau“. Länger erkennt langsamere Befehle, aber auch mehr Gerede.</string>
@@ -90,7 +88,8 @@
 
     <string name="heard_ok">OK</string>
     <string name="reason_unknown">kein Befehl</string>
-    <string name="reason_low_confidence">unsicher</string>
+    <string name="reason_low_confidence">unsicher: unter %1$s</string>
+    <string name="reason_no_word_scores">keine Wortwerte</string>
     <string name="reason_multiple">zwei Befehle</string>
     <string name="reason_in_speech">im Gespräch</string>
     <string name="reason_locked">gesperrt</string>

@@ -391,7 +391,7 @@ class ScoreboardViewModel(
             updateSettings { it.copy(voiceCommands = false) }
         }
         val want = match != null && settings.voiceCommands && foreground && scoreboardVisible && micPermission
-        if (want) voice.start(settings.language, settings.voiceSensitivity, settings.microphone, settings.commandWords(), settings.voicePauseMs) else voice.stop()
+        if (want) voice.start(settings.language, settings.minConfidence, settings.microphone, settings.commandWords(), settings.voicePauseMs) else voice.stop()
         if (!want || !settings.showHeard) {
             heardJob?.cancel()
             _uiState.update { it.copy(voice = it.voice.copy(lastHeard = null)) }

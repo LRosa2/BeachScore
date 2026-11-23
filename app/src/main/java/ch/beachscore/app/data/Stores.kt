@@ -9,7 +9,7 @@ import ch.beachscore.app.voice.CommandWords
 import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.HalfJoiner
 import ch.beachscore.app.voice.MicChoice
-import ch.beachscore.app.voice.VoiceSensitivity
+import ch.beachscore.app.voice.VoiceThreshold
 import kotlinx.coroutines.flow.Flow
 
 data class Settings(
@@ -26,7 +26,8 @@ data class Settings(
     val legacyVolumeKeys: Boolean = false,
     /** Phase 2: listen for spoken commands. Off by default; needs RECORD_AUDIO. */
     val voiceCommands: Boolean = false,
-    val voiceSensitivity: VoiceSensitivity = VoiceSensitivity.NORMAL,
+    /** "Minimum confidence" in hundredths (3.5.0; was three levels). See [VoiceThreshold]. */
+    val voiceMinConfidencePct: Int = VoiceThreshold.DEFAULT_PCT,
     /** Diagnostics line with the last heard phrase (only while voice commands are on). */
     val showHeard: Boolean = true,
     /** Preferred input for voice commands; null is "Automatic" (Android's routing). */
@@ -37,12 +38,16 @@ data class Settings(
     val voicePauseMs: Long = HalfJoiner.DEFAULT_PAUSE_MS,
 ) {
     /** The words the recogniser listens for in the current language. */
+    /** The threshold every command word must reach. */
+    val minConfidence: Double get() = VoiceThreshold.toConfidence(voiceMinConfidencePct)
+
     fun commandWords(): CommandWords = CommandWords.of(language, voiceWords[language] ?: CustomWords())
 
     /** Brings values read from disk back into the ranges the UI offers. */
     fun sanitized(): Settings = copy(
         pointsPerSet = pointsPerSet.takeIf { it in MatchState.ALLOWED_TARGETS } ?: MatchState.DEFAULT_TARGET,
         tapLockMs = (tapLockMs.coerceIn(TapLock.MIN_MS, TapLock.MAX_MS) / TapLock.STEP_MS) * TapLock.STEP_MS,
+        voiceMinConfidencePct = VoiceThreshold.sanitize(voiceMinConfidencePct),
         voicePauseMs = voicePauseMs.takeIf { it in HalfJoiner.PAUSE_CHOICES_MS } ?: HalfJoiner.DEFAULT_PAUSE_MS,
     )
 }

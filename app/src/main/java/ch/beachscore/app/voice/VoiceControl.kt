@@ -37,7 +37,7 @@ interface VoiceControl {
      */
     fun start(
         language: Language,
-        sensitivity: VoiceSensitivity,
+        minConfidence: Double,
         microphone: MicChoice? = null,
         words: CommandWords = CommandWords.defaults(language),
         maxPauseMs: Long = HalfJoiner.DEFAULT_PAUSE_MS,

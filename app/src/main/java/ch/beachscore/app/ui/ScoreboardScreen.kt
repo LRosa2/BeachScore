@@ -181,7 +181,7 @@ fun ScoreboardScreen(
             }
             LockBar(state, Modifier.align(Alignment.TopCenter))
             Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
-                VoiceIndicator(state.voice)
+                VoiceIndicator(state.voice, minConfidencePct = state.settings.voiceMinConfidencePct)
                 RemoteIndicator(state.remotePress)
             }
             ControlStrip(

@@ -70,6 +70,7 @@ import ch.beachscore.app.voice.MicRow
 import ch.beachscore.app.voice.Microphones
 import ch.beachscore.app.voice.HalfJoiner
 import ch.beachscore.app.voice.VoiceSensitivity
+import ch.beachscore.app.voice.VoiceThreshold
 import ch.beachscore.app.voice.CommandWords
 import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.VoiceStatus
@@ -250,6 +251,42 @@ private fun TapLockSlider(valueMs: Long, onChange: (Long) -> Unit) {
     }
 }
 
+/**
+ * 3.5.0: "Minimum confidence" 0.30 to 0.95 in steps of 0.05. Local while dragging, saved when
+ * released (every saved change restarts the recogniser). The legend keeps the old levels.
+ */
+@Composable
+private fun MinConfidenceSlider(valuePct: Int, onChange: (Int) -> Unit) {
+    var dragging by remember(valuePct) { mutableFloatStateOf(valuePct.toFloat()) }
+    val shown = VoiceThreshold.sanitize(Math.round(dragging))
+    val steps = (VoiceThreshold.MAX_PCT - VoiceThreshold.MIN_PCT) / VoiceThreshold.STEP_PCT - 1
+    fun level(s: VoiceSensitivity) = VoiceThreshold.label(Math.round(s.minConfidence * 100).toInt())
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            stringResource(R.string.min_confidence, VoiceThreshold.label(shown)),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.testTag("min_confidence_label"),
+        )
+        Slider(
+            value = dragging,
+            onValueChange = { dragging = it },
+            onValueChangeFinished = { onChange(VoiceThreshold.sanitize(Math.round(dragging))) },
+            valueRange = VoiceThreshold.MIN_PCT.toFloat()..VoiceThreshold.MAX_PCT.toFloat(),
+            steps = steps,
+            modifier = Modifier.testTag("min_confidence"),
+        )
+        Text(
+            stringResource(
+                R.string.min_confidence_legend,
+                level(VoiceSensitivity.STRICT), level(VoiceSensitivity.NORMAL), level(VoiceSensitivity.RELAXED),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(stringResource(R.string.min_confidence_hint), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VoiceSection(
@@ -287,27 +324,7 @@ private fun VoiceSection(
 
         MicrophoneChoice(settings, voice, onChange)
 
-        Labeled(R.string.voice_sensitivity) {
-            val levels = listOf(
-                VoiceSensitivity.STRICT to R.string.voice_sensitivity_strict,
-                VoiceSensitivity.NORMAL to R.string.voice_sensitivity_normal,
-                VoiceSensitivity.RELAXED to R.string.voice_sensitivity_relaxed,
-            )
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                levels.forEachIndexed { i, (level, label) ->
-                    SegmentedButton(
-                        selected = settings.voiceSensitivity == level,
-                        onClick = { onChange { it.copy(voiceSensitivity = level) } },
-                        shape = SegmentedButtonDefaults.itemShape(i, levels.size),
-                        modifier = Modifier.testTag("sensitivity_${level.name.lowercase()}"),
-                        // No check mark: three labels must fit the narrow panel on one line.
-                        icon = {},
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                    ) { Text(stringResource(label), maxLines = 1, softWrap = false, fontSize = 14.sp) }
-                }
-            }
-        }
-        Text(stringResource(R.string.voice_sensitivity_hint), style = MaterialTheme.typography.bodySmall)
+        MinConfidenceSlider(settings.voiceMinConfidencePct) { pct -> onChange { it.copy(voiceMinConfidencePct = pct) } }
         Labeled(R.string.voice_pause) {
             val choices = HalfJoiner.PAUSE_CHOICES_MS
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

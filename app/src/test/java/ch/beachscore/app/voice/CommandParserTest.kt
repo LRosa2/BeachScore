@@ -34,6 +34,23 @@ class CommandParserTest {
     private fun reason(heard: Heard?) = (heard?.verdict as? Verdict.Rejected)?.reason
 
     @Test
+    fun `a result without word scores is not called low confidence`() {
+        // 3.5.0: the text says "point blue" but the word list does not match it.
+        val noWords = VoskResult("point blue", listOf(VoskResult.Word("point", 1.0)))
+        val heard = CommandParser.parse(noWords, Language.EN, 0.30)
+        assertEquals(RejectReason.NO_WORD_SCORES, reason(heard))
+    }
+
+    @Test
+    fun `any threshold from the slider applies`() {
+        val weak = json("punkt" to 0.52, "blau" to 0.97)
+        assertEquals(RejectReason.LOW_CONFIDENCE, reason(CommandParser.parse(VoskResult.parse(weak)!!, Language.DE, 0.55)))
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(CommandParser.parse(VoskResult.parse(weak)!!, Language.DE, 0.50)))
+        // Exactly at the threshold passes.
+        assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(CommandParser.parse(VoskResult.parse(json("punkt" to 0.55, "blau" to 1.0))!!, Language.DE, VoiceThreshold.toConfidence(55))))
+    }
+
+    @Test
     fun `english commands`() {
         assertEquals(ScoreCommand.TeamPoint(Team.BLUE), command(parse(json("point" to 1.0, "blue" to 0.98))))
         assertEquals(ScoreCommand.TeamPoint(Team.RED), command(parse(json("point" to 0.99, "red" to 1.0))))
@@ -178,9 +195,9 @@ class CommandParserTest {
     }
 
     @Test
-    fun `result without word confidences is rejected as low confidence`() {
+    fun `result without word confidences gets its own reason, not low confidence`() {
         val heard = CommandParser.parse(VoskResult.parse("""{"text" : "point blue"}""")!!, Language.EN, 0.5)
-        assertEquals(RejectReason.LOW_CONFIDENCE, reason(heard))
+        assertEquals(RejectReason.NO_WORD_SCORES, reason(heard))
     }
 
     @Test

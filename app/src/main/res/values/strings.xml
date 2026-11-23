@@ -65,11 +65,9 @@
     <string name="voice_commands">Voice commands</string>
     <string name="voice_commands_hint">Say “point blue”, “point red” or “undo”. Listens only while the scoreboard is open.</string>
     <string name="voice_permission_denied">Voice commands need the microphone, so they stay off. To use them, allow the microphone for BeachScore and switch them on again.</string>
-    <string name="voice_sensitivity">Voice sensitivity</string>
-    <string name="voice_sensitivity_strict">Strict</string>
-    <string name="voice_sensitivity_normal">Normal</string>
-    <string name="voice_sensitivity_relaxed">Relaxed</string>
-    <string name="voice_sensitivity_hint">Strict: fewer wrong points. Relaxed: accepts less clear commands from further away.</string>
+    <string name="min_confidence">Minimum confidence: %1$s</string>
+    <string name="min_confidence_legend">Strict %1$s · Normal %2$s · Relaxed %3$s</string>
+    <string name="min_confidence_hint">Lower accepts more commands, but also gives more false points. Compare with the number next to a rejected command in the heard line.</string>
     <string name="voice_pause">Pause between words</string>
     <string name="voice_pause_seconds">%1$d s</string>
     <string name="voice_pause_hint">Longest pause between “point” and the team, e.g. “point … blue”. Longer catches slower commands but also more chatter.</string>
@@ -95,7 +93,8 @@
 
     <string name="heard_ok">OK</string>
     <string name="reason_unknown">not a command</string>
-    <string name="reason_low_confidence">unsure</string>
+    <string name="reason_low_confidence">unsure: below %1$s</string>
+    <string name="reason_no_word_scores">no word scores</string>
     <string name="reason_multiple">two commands</string>
     <string name="reason_in_speech">in speech</string>
     <string name="reason_locked">locked</string>

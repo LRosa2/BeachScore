@@ -14,7 +14,7 @@ import ch.beachscore.app.voice.CustomWords
 import ch.beachscore.app.voice.MicChoice
 import ch.beachscore.app.voice.VoiceWords
 import ch.beachscore.app.voice.WordField
-import ch.beachscore.app.voice.VoiceSensitivity
+import ch.beachscore.app.voice.VoiceThreshold
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -48,7 +48,8 @@ class SettingsRepository(
                 prefs.remove(HARDWARE_BUTTONS)
             }
             prefs[VOICE_COMMANDS] = new.voiceCommands
-            prefs[VOICE_SENSITIVITY] = new.voiceSensitivity.name
+            prefs[VOICE_MIN_CONFIDENCE_PCT] = new.voiceMinConfidencePct
+            prefs.remove(VOICE_SENSITIVITY)
             prefs[SHOW_HEARD] = new.showHeard
             prefs[MICROPHONE] = new.microphone?.encode() ?: ""
             prefs[VOICE_PAUSE_MS] = new.voicePauseMs
@@ -72,8 +73,9 @@ class SettingsRepository(
             remoteKeys = RemoteKeys.decode(this[REMOTE_KEYS]),
             legacyVolumeKeys = this[REMOTE_KEYS] == null && this[HARDWARE_BUTTONS] == true,
             voiceCommands = this[VOICE_COMMANDS] ?: defaults.voiceCommands,
-            voiceSensitivity = VoiceSensitivity.entries.firstOrNull { it.name == this[VOICE_SENSITIVITY] }
-                ?: defaults.voiceSensitivity,
+            // 3.4 stored a level name; it maps to its number until the slider is saved.
+            voiceMinConfidencePct = this[VOICE_MIN_CONFIDENCE_PCT] ?: VoiceThreshold.fromLegacy(this[VOICE_SENSITIVITY])
+                ?: defaults.voiceMinConfidencePct,
             showHeard = this[SHOW_HEARD] ?: defaults.showHeard,
             microphone = MicChoice.decode(this[MICROPHONE]),
             voicePauseMs = this[VOICE_PAUSE_MS] ?: defaults.voicePauseMs,
@@ -96,7 +98,9 @@ class SettingsRepository(
         val HARDWARE_BUTTONS = booleanPreferencesKey("hardware_buttons")
         val REMOTE_KEYS = stringPreferencesKey("remote_keys")
         val VOICE_COMMANDS = booleanPreferencesKey("voice_commands")
+        /** 3.4 and earlier: STRICT/NORMAL/RELAXED. Read for the migration only. */
         val VOICE_SENSITIVITY = stringPreferencesKey("voice_sensitivity")
+        val VOICE_MIN_CONFIDENCE_PCT = intPreferencesKey("voice_min_confidence_pct")
         val SHOW_HEARD = booleanPreferencesKey("show_heard")
         val MICROPHONE = stringPreferencesKey("microphone")
         val VOICE_PAUSE_MS = longPreferencesKey("voice_pause_ms")

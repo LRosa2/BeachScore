@@ -90,7 +90,7 @@ class VoiceInput(
     private var choice: MicChoice? = null
 
     private var job: Job? = null
-    private data class Config(val language: Language, val sensitivity: VoiceSensitivity, val words: CommandWords, val maxPauseMs: Long)
+    private data class Config(val language: Language, val minConfidence: Double, val words: CommandWords, val maxPauseMs: Long)
 
     private var config: Config? = null
 
@@ -116,12 +116,12 @@ class VoiceInput(
     }
 
     @Synchronized
-    override fun start(language: Language, sensitivity: VoiceSensitivity, microphone: MicChoice?, words: CommandWords, maxPauseMs: Long) {
+    override fun start(language: Language, minConfidence: Double, microphone: MicChoice?, words: CommandWords, maxPauseMs: Long) {
         if (choice != microphone) {
             choice = microphone
             routingChanges.value++
         }
-        val wanted = Config(language, sensitivity, words, maxPauseMs)
+        val wanted = Config(language, minConfidence, words, maxPauseMs)
         if (config == wanted && job?.isActive == true) return
         config = wanted
         val previous = job
@@ -161,7 +161,7 @@ class VoiceInput(
         }
         if (!currentCoroutineContext().isActive) return
 
-        CommandRecognizer(model, config.words, config.sensitivity.minConfidence, maxPauseMs = config.maxPauseMs).use { recognizer ->
+        CommandRecognizer(model, config.words, config.minConfidence, maxPauseMs = config.maxPauseMs).use { recognizer ->
             val gate = EchoGate(echoGuard)
             var failuresInARow = 0
             try {

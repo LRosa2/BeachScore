@@ -32,6 +32,7 @@ import ch.beachscore.app.voice.MicKind
 import ch.beachscore.app.voice.RejectReason
 import ch.beachscore.app.voice.Verdict
 import ch.beachscore.app.voice.VoiceStatus
+import ch.beachscore.app.voice.VoiceThreshold
 import java.util.Locale
 
 private val Pill = Color(0xB3000000)
@@ -45,7 +46,7 @@ private val Failed = Color(0xFFFF6B6B)
  * word confidence and verdict. It is not a touch target, so taps there still score.
  */
 @Composable
-fun VoiceIndicator(voice: VoiceUi, modifier: Modifier = Modifier) {
+fun VoiceIndicator(voice: VoiceUi, modifier: Modifier = Modifier, minConfidencePct: Int = VoiceThreshold.DEFAULT_PCT) {
     val status = voice.status
     if (status == VoiceStatus.Off) return
     val description = stringResource(
@@ -84,17 +85,20 @@ fun VoiceIndicator(voice: VoiceUi, modifier: Modifier = Modifier) {
             Text("${(status.progress * 100).toInt()}%", color = Color.White, fontSize = 15.sp)
         }
         AnimatedVisibility(voice.lastHeard != null, enter = fadeIn(), exit = fadeOut()) {
-            voice.lastHeard?.let { HeardText(it) }
+            voice.lastHeard?.let { HeardText(it, minConfidencePct) }
         }
     }
 }
 
 @Composable
-private fun HeardText(heard: Heard) {
+private fun HeardText(heard: Heard, minConfidencePct: Int) {
     val verdict = heard.verdict
-    val (mark, color, label) = when (verdict) {
-        is Verdict.Accepted -> Triple("✓", Accepted, stringResource(R.string.heard_ok))
-        is Verdict.Rejected -> Triple("✗", Rejected, stringResource(reasonText(verdict.reason)))
+    val (mark, color, label) = when {
+        verdict is Verdict.Accepted -> Triple("✓", Accepted, stringResource(R.string.heard_ok))
+        // The threshold beside the command's own number: "0.62 ✗ unsure: below 0.70".
+        verdict == Verdict.Rejected(RejectReason.LOW_CONFIDENCE) ->
+            Triple("✗", Rejected, stringResource(R.string.reason_low_confidence, VoiceThreshold.label(minConfidencePct)))
+        else -> Triple("✗", Rejected, stringResource(reasonText((verdict as Verdict.Rejected).reason)))
     }
     val confidence = heard.minConfidence?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "–"
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("heard_line")) {
@@ -109,6 +113,7 @@ internal fun reasonText(reason: RejectReason): Int = when (reason) {
     RejectReason.MULTIPLE -> R.string.reason_multiple
     RejectReason.IN_SPEECH -> R.string.reason_in_speech
     RejectReason.LOW_CONFIDENCE -> R.string.reason_low_confidence
+    RejectReason.NO_WORD_SCORES -> R.string.reason_no_word_scores
     RejectReason.ECHO_GUARD -> R.string.reason_echo_guard
     RejectReason.LOCKED -> R.string.reason_locked
     RejectReason.SET_WON -> R.string.reason_set_won
